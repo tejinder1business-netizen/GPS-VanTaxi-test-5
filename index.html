@@ -87,13 +87,13 @@
         }
         
         .cam-display-box { display: none; width: 100%; margin-top: 15px; border-top: 2px dashed #e5e5ea; padding-top: 15px; }
-        .cam-img-frame { width: 100%; height: auto; border-radius: 8px; border: 2px solid #1c1c1e; background: #eee; display: block; cursor: zoom-in; touch-action: pan-y; }
+        .cam-frame-window { width: 100%; height: 260px; border-radius: 8px; border: 2px solid #1c1c1e; background: #eee; display: block; }
         .btn-close-cam { background: #1c1c1e; color: white; width: 100%; margin-top: 12px; padding: 12px; border-radius: 8px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; text-transform: uppercase; } 
 
         /* FULL SCREEN LIGHTBOX WINDOW */
-        .fullscreen-lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 3000; justify-content: center; align-items: center; }
-        .fullscreen-lightbox img { width: 100%; height: 100%; object-fit: contain; }
-        .btn-close-lightbox { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.25); color: white; border: 2px solid white; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .fullscreen-lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 3000; flex-direction: column; }
+        .fullscreen-lightbox iframe { width: 100%; height: 100%; border: none; }
+        .btn-close-lightbox { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); color: white; border: 2px solid white; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 3100; }
     </style>
 </head>
 <body> 
@@ -120,18 +120,22 @@
     <div id="camera-menu-pop" class="driver-modal cam-list-grid">
         <span class="modal-title">Street View Cameras</span>
         <div class="grid-options" id="camera-list-options">
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/BurrardCornwallSouth.jpg')">Burrard and Cornwall</button>
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/Cambie02EastEast.jpg')">Cambie Bridge</button>
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/GranvilleRobsonSouthSouth.jpg')">Granville and Robson</button>
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/Hastingseast_boundary.jpg')">Hastings and Boundary Rd</button>
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/TransCanada01East.jpg')">HWY 1 and E 1st ave</button>
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/KnightBridgeNorth.jpg')">Knight st Bridge</button>
-            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cameraimages/Oak70EastEast.jpg')">Oak and 70th</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/BurrardCornwall4.htm')">Burrard and Cornwall</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/cambiebridge.htm')">Cambie Bridge</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/granvilleHoweOnRamp.htm')">Granville Bridge</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/granville70th.htm')">Granville and 70th Avenue</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/granvillerobson.htm')">Granville and Robson</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/hastings.htm')">Hastings and Boundary Rd.</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/transcanada01.htm')">HWY 1 and 1st Ave</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/knightMarineBridge.htm')">Knight Street Bridge</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/oak4.htm')">Oak and 70th</button>
+            <button class="btn-camera-select full-width-btn" onclick="toggleLiveCameraFeed('https://trafficcams.vancouver.ca/denman3.htm')">W Georgia and Denman st.</button>
         </div>
         
         <div id="live-cam-display-box" class="cam-display-box">
-            <img id="hud-cam-feed" class="cam-img-frame" src="" alt="Live Traffic Feed Loading..." onclick="launchFullscreenViewer()" />
-            <div style="text-align:center; font-size:11px; margin-top:5px; font-weight:bold; color:#666;">SWIPE LEFT/RIGHT TO SWITCH • TAP FOR FULLSCREEN</div>
+            <iframe id="hud-cam-frame" class="cam-frame-window" src=""></iframe>
+            <div style="text-align:center; font-size:12px; margin-top:8px; font-weight:bold; color:#1c1c1e; background:#ffd100; padding:6px; border-radius:6px; cursor:pointer;" onclick="launchFullscreenViewer()">⚠️ TAP HERE FOR LARGE FULLSCREEN STREAM</div>
+            <div style="text-align:center; font-size:11px; margin-top:5px; font-weight:bold; color:#666;">SWIPE SURFACING TARGET TO ALTER CHANNELS</div>
         </div>
         
         <button class="btn-close-cam" onclick="hideModals()">Close Menu</button>
@@ -139,7 +143,7 @@
 
     <div id="lightbox-viewer" class="fullscreen-lightbox">
         <button class="btn-close-lightbox" onclick="exitFullscreenViewer()">✕</button>
-        <img id="lightbox-target-img" src="" alt="Full Screen Display" />
+        <iframe id="lightbox-target-frame" src=""></iframe>
     </div> 
 
     <div id="flag-pop" class="driver-modal flag-grid">
@@ -247,20 +251,21 @@
         let touchStartX = 0;
         let touchEndX = 0;
         const minimumSwipeDistance = 50; 
-        const cameraFeedImage = document.getElementById('hud-cam-feed');
+        const cameraFrameElement = document.getElementById('hud-cam-frame');
 
-        cameraFeedImage.addEventListener('touchstart', function(event) {
+        // Capture swipe gestures inside the iframe wrapper container bounds safely
+        cameraFrameElement.addEventListener('touchstart', function(event) {
             touchStartX = event.changedTouches[0].screenX;
         }, { passive: true });
 
-        cameraFeedImage.addEventListener('touchend', function(event) {
+        cameraFrameElement.addEventListener('touchend', function(event) {
             touchEndX = event.changedTouches[0].screenX;
             evaluateSwipeDirection();
         }, { passive: true });
 
 
         // =========================================================================================
-        // CAMERA SWIPE MANAGER
+        // REBUILT CAMERA MENUS AND PIPELINE WORKFLOW
         // =========================================================================================
         function evaluateSwipeDirection() {
             const cameraButtons = Array.from(document.querySelectorAll('#camera-list-options button'));
@@ -285,16 +290,16 @@
 
         function openCameraListMenu() {
             document.getElementById('live-cam-display-box').style.display = 'none';
+            document.getElementById('hud-cam-frame').src = "";
             activeCamUrl = "";
             activeRawTargetUrl = "";
             document.querySelectorAll('#camera-list-options button').forEach(btn => btn.classList.remove('selected-cam'));
-            if (cameraRefreshInterval) clearInterval(cameraRefreshInterval);
             showModal('camera-menu-pop');
         } 
 
-        // DIRECT PARSING: Since you provided direct .jpg paths, we safely load them without string replacements
         function toggleLiveCameraFeed(targetUrl) {
             activeRawTargetUrl = targetUrl;
+            activeCamUrl = targetUrl;
 
             document.querySelectorAll('#camera-list-options button').forEach(btn => {
                 if (btn.getAttribute('onclick').includes(targetUrl)) {
@@ -304,25 +309,24 @@
                 }
             });
 
-            activeCamUrl = targetUrl;
-            launchFullscreenViewer();
+            // Refresh frame instantly
+            const frame = document.getElementById('hud-cam-frame');
+            frame.src = `${targetUrl}?refresh=${Date.now()}`;
+            document.getElementById('live-cam-display-box').style.display = 'block';
         } 
 
         function launchFullscreenViewer() {
             if (!activeCamUrl) return;
             const lightbox = document.getElementById('lightbox-viewer');
-            const lightboxImg = document.getElementById('lightbox-target-img');
+            const lightboxFrame = document.getElementById('lightbox-target-frame');
             
-            lightboxImg.onclick = function() {
-                exitFullscreenViewer();
-            };
-            
-            lightboxImg.src = `${activeCamUrl}?t=${Date.now()}`;
+            lightboxFrame.src = `${activeCamUrl}?fullscreen=${Date.now()}`;
             lightbox.style.display = 'flex';
         } 
 
         function exitFullscreenViewer() {
             document.getElementById('lightbox-viewer').style.display = 'none';
+            document.getElementById('lightbox-target-frame').src = "";
         } 
 
         // GEOLOCATION ENGINE
@@ -401,7 +405,7 @@
         function hideModals() {
             document.getElementById('screen-overlay').style.display = 'none';
             document.querySelectorAll('.driver-modal').forEach(m => m.style.display = 'none');
-            if (cameraRefreshInterval) clearInterval(cameraRefreshInterval);
+            document.getElementById('hud-cam-frame').src = "";
             activeCamUrl = "";
             activeRawTargetUrl = "";
         } 
@@ -546,7 +550,6 @@
 
                 dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
 
-                // Retains the officer on screen for exactly 30 minutes
                 setTimeout(() => {
                     map.removeLayer(officerMarker);
                 }, 1800000);
