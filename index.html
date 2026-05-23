@@ -67,19 +67,20 @@
         .police-grid { width: 300px; }
         .btn-police-opt { background: #007aff !important; color: #ffffff !important; border: 3px solid #007aff; } 
 
-        /* STREET VIEW CAMERAS OVERLAY MODAL WINDOW */
-        .cam-list-grid { width: 350px; max-height: 85vh; overflow-y: auto; }
+        /* STREET VIEW CAMERAS OVERLAY MODAL WINDOW WITH 4-IMAGE TILES */
+        .cam-list-grid { width: 360px; max-height: 90vh; overflow-y: auto; }
+        .btn-camera-select { background: #34c759 !important; color: #ffffff !important; border: 3px solid #248a3d !important; text-align: left; padding: 14px 12px !important; font-size: 0.95rem !important; }
         
-        .btn-camera-select { 
-            background: #34c759 !important; 
-            color: #ffffff !important; 
-            border: 3px solid #248a3d !important; 
-            text-align: left; 
-            padding: 14px 12px !important; 
-            font-size: 0.95rem !important; 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
+        /* The 4-Image Quad Display Grid Layout */
+        .quad-cam-display { display: none; margin-top: 15px; border-top: 2px dashed #e5e5ea; padding-top: 15px; }
+        .quad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .quad-tile { width: 100%; height: 110px; background: #222; border: 2px solid #1c1c1e; border-radius: 6px; object-fit: cover; cursor: zoom-in; }
+        
+        /* Full View Mode Modifier style */
+        .quad-tile.fullscreen-mode {
+            position: fixed; top: 0; left: 0; width: 100vw !important; height: 100vh !important;
+            z-index: 2500; object-fit: contain; background: #000; border: none; border-radius: 0;
+            cursor: zoom-out;
         }
         .btn-close-cam { background: #1c1c1e; color: white; width: 100%; margin-top: 12px; padding: 12px; border-radius: 8px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; text-transform: uppercase; } 
     </style>
@@ -108,16 +109,23 @@
     <div id="camera-menu-pop" class="driver-modal cam-list-grid">
         <span class="modal-title">Street View Cameras</span>
         <div class="grid-options" id="camera-list-options">
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/BurrardCornwall4.htm')">Burrard and Cornwall</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/cambiebridge.htm')">Cambie Bridge</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/granvilleHoweOnRamp.htm')">Granville Bridge</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/granville70th.htm')">Granville and 70th Avenue</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/granvillerobson.htm')">Granville and Robson</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/hastings.htm')">Hastings and Boundary Rd.</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/transcanada01.htm')">HWY 1 and 1st Ave</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/knightMarineBridge.htm')">Knight Street Bridge</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/oak4.htm')">Oak and 70th</button>
-            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/denman3.htm')">W Georgia and Denman st.</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('BurrardCornwall')">Burrard and Cornwall</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('Cambie')">Cambie Bridge</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('GranvilleRobson')">Granville and Robson</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('Hastingseast_boundary')">Hastings and Boundary Rd</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('TransCanada01')">HWY 1 and E 1st ave</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('KnightBridge')">Knight st Bridge</button>
+            <button class="btn-camera-select full-width-btn" onclick="loadIntersectionQuad('Oak70')">Oak and 70th</button>
+        </div>
+        
+        <div id="quad-cam-container" class="quad-cam-display">
+            <div style="text-align:center; font-size:11px; font-weight:bold; margin-bottom:8px; color:#34c759;">TAP ANY IMAGE FOR FULL SCREEN MODE</div>
+            <div class="quad-grid">
+                <img id="cam-img-1" class="quad-tile" alt="North/East Frame" onclick="toggleImageFullscreen(this)" />
+                <img id="cam-img-2" class="quad-tile" alt="South/West Frame" onclick="toggleImageFullscreen(this)" />
+                <img id="cam-img-3" class="quad-tile" alt="Approach Frame" onclick="toggleImageFullscreen(this)" />
+                <img id="cam-img-4" class="quad-tile" alt="Overview Frame" onclick="toggleImageFullscreen(this)" />
+            </div>
         </div>
         
         <button class="btn-close-cam" onclick="hideModals()">Close Menu</button>
@@ -222,16 +230,49 @@
         }); 
 
         // =========================================================================================
-        // CAMERA ACTION CONTROLLER (NEW TAB BYPASS MECHANISM)
+        // CAMERA ENGAGEMENT ENGINE (QUAD TILES WITH FULL SCREEN TOGGLE)
         // =========================================================================================
         function openCameraListMenu() {
+            document.getElementById('quad-cam-container').style.display = 'none';
             showModal('camera-menu-pop');
         } 
 
-        function openLiveCameraTab(targetUrl) {
-            // Opens the camera stream directly in a new dedicated tab, bypassing iframe restrictions
-            window.open(targetUrl, '_blank');
-        } 
+        function loadIntersectionQuad(prefix) {
+            const timeStamp = Date.now();
+            const proxyBase = "https://images.weserv.nl/?url=trafficcams.vancouver.ca/cameraimages/";
+
+            // Maps intersection configurations to alternative direction suffixes
+            const suffixes = {
+                "BurrardCornwall": ["North.jpg", "South.jpg", "East.jpg", "West.jpg"],
+                "Cambie": ["01North.jpg", "02EastEast.jpg", "03South.jpg", "04West.jpg"],
+                "GranvilleRobson": ["NorthNorth.jpg", "SouthSouth.jpg", "East.jpg", "West.jpg"],
+                "Hastingseast_boundary": ["east_boundary.jpg", "west_boundary.jpg", "north_boundary.jpg", "south_boundary.jpg"],
+                "TransCanada01": ["East.jpg", "West.jpg", "North.jpg", "South.jpg"],
+                "KnightBridge": ["North.jpg", "South.jpg", "East.jpg", "West.jpg"],
+                "Oak70": ["NorthNorth.jpg", "SouthSouth.jpg", "EastEast.jpg", "WestWest.jpg"]
+            };
+
+            const selectedSuffixes = suffixes[prefix] || ["North.jpg", "South.jpg", "East.jpg", "West.jpg"];
+
+            // Assign proxy shielded URLs directly to target images to clear CORS blocks
+            document.getElementById('cam-img-1').src = `${proxyBase}${prefix}${selectedSuffixes[0]}?t=${timeStamp}`;
+            document.getElementById('cam-img-2').src = `${proxyBase}${prefix}${selectedSuffixes[1]}?t=${timeStamp}`;
+            document.getElementById('cam-img-3').src = `${proxyBase}${prefix}${selectedSuffixes[2]}?t=${timeStamp}`;
+            document.getElementById('cam-img-4').src = `${proxyBase}${prefix}${selectedSuffixes[3]}?t=${timeStamp}`;
+
+            document.getElementById('quad-cam-container').style.display = 'block';
+        }
+
+        function toggleImageFullscreen(imgElement) {
+            // Toggles between quad view and absolute full screen view mode seamlessly
+            if (imgElement.classList.contains('fullscreen-mode')) {
+                imgElement.classList.remove('fullscreen-mode');
+            } else {
+                // Clear any other lingering full screen item first
+                document.querySelectorAll('.quad-tile').forEach(el => el.classList.remove('fullscreen-mode'));
+                imgElement.classList.add('fullscreen-mode');
+            }
+        }
 
         // GEOLOCATION ENGINE
         map.locate({ watch: true, enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
@@ -309,6 +350,7 @@
         function hideModals() {
             document.getElementById('screen-overlay').style.display = 'none';
             document.querySelectorAll('.driver-modal').forEach(m => m.style.display = 'none');
+            document.querySelectorAll('.quad-tile').forEach(el => el.classList.remove('fullscreen-mode'));
         } 
 
         function handleRecenter() {
