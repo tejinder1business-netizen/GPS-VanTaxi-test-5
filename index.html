@@ -37,6 +37,7 @@
 
         /* Custom Drop Markers - SOLID COLORS */
         .red-man-icon { font-size: 34px; text-align: center; line-height: 34px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.6)); }
+        .police-officer-icon { font-size: 36px; text-align: center; line-height: 36px; filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.6)); }
         
         /* Driving Selection Popups - SOLID WHITE BACKGROUND FOUNDATIONS */
         .driver-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 22px; border-radius: 16px; z-index: 2000; box-shadow: 0 14px 40px rgba(0,0,0,0.5); background: #ffffff !important; border: 4px solid #1c1c1e; }
@@ -186,9 +187,9 @@
     <div id="police-pop" class="driver-modal police-grid">
         <span class="modal-title">Police Threat Zone</span>
         <div class="grid-options">
-            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('Radar')">Radar</button>
-            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('Emergency')">Emergency</button>
-            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('Hidden setup')">Hidden</button>
+            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('radar')">Radar</button>
+            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('emergency')">Emergency</button>
+            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('hidden')">Hidden</button>
         </div>
     </div> 
 
@@ -206,8 +207,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // =========================================================================================
-        // LANDMARK: MAP CORE INITIALIZER
-        // [PLAIN ENGLISH: LOADS THE MAP ENGINE, LOCKS VIEW NORTH-UP, SETS PHONE ZOOM LIMITS]
+        // MAP CORE INITIALIZER
         // =========================================================================================
         const map = L.map('map', { 
             zoomControl: false, 
@@ -220,7 +220,7 @@
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); 
 
-        // Core Status State Monitoring Parameters
+        // Core Status States
         let vehiclePos = null;
         let lastGeocodedPos = null;
         let vehicleMarker = null;
@@ -231,17 +231,15 @@
         let activeCamUrl = ""; 
         let activeRawTargetUrl = ""; 
 
-        // Selection Handlers
+        // Selection variables
         let chosenCautionType = "";
-        let chosenPoliceType = ""; 
+        let chosenPoliceType = "radar"; // Defaults safely to radar string 
 
-        // Dynamic Live Cache resolving addresses cleanly
+        // Geocoding caches
         let currentAddressData = { houseNumber: "", streetName: "Unknown Street", isLoaded: false }; 
-        
-        // Variable tracking storage for audio replay history
         let lastSpokenSpeechString = "";
 
-        // Custom Top-Down Vector Yellow Taxi Marker
+        // Moving Yellow Taxi Icon
         const taxiIconStyle = L.divIcon({
             className: 'taxi-vector-icon',
             html: 'TAXI',
@@ -249,7 +247,7 @@
             iconAnchor: [13, 13]
         }); 
 
-        // Setup touch tracking variables for camera sliding functionality
+        // Touch tracking variables for camera sliding functionality
         let touchStartX = 0;
         let touchEndX = 0;
         const minimumSwipeDistance = 50; 
@@ -266,8 +264,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: CAMERA SWIPE INTERACTIVE MANAGER
-        // [PLAIN ENGLISH: TRACKS FINGER SWIPES ON THE CAMERA PREVIEW TO SWITCH STREET CAMS QUICKLY]
+        // CAMERA SWIPE MANAGER
         // =========================================================================================
         function evaluateSwipeDirection() {
             const cameraButtons = Array.from(document.querySelectorAll('#camera-list-options button'));
@@ -290,11 +287,6 @@
             }
         }
 
-
-        // =========================================================================================
-        // LANDMARK: OPEN CAMERA SELECTION WINDOW
-        // [PLAIN ENGLISH: RESETS PREVIOUS CAMERA TIMERS AND OPENS THE TRAFFIC CAMERA POPUP MENU]
-        // =========================================================================================
         function openCameraListMenu() {
             document.getElementById('live-cam-display-box').style.display = 'none';
             activeCamUrl = "";
@@ -304,11 +296,6 @@
             showModal('camera-menu-pop');
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: DYNAMIC LIVE CAMERA STREAM PARSER
-        // [PLAIN ENGLISH: CONVERTS CITY WEB ADDRESSES INTO REAL-TIME IMAGE LINKS FOR YOUR SCREEN]
-        // =========================================================================================
         function toggleLiveCameraFeed(targetUrl) {
             activeRawTargetUrl = targetUrl;
 
@@ -342,11 +329,6 @@
             launchFullscreenViewer();
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: FULL SCREEN LIGHTBOX PROJECTOR
-        // [PLAIN ENGLISH: POPS OPEN A BIG FULL-SCREEN BLACK LAYER TO SHOW THE LIVE TRAFFIC FEED IMAGE]
-        // =========================================================================================
         function launchFullscreenViewer() {
             if (!activeCamUrl) return;
             const lightbox = document.getElementById('lightbox-viewer');
@@ -360,36 +342,27 @@
             lightbox.style.display = 'flex';
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: DISMISS FULL SCREEN LIGHTBOX
-        // [PLAIN ENGLISH: CLOSES THE FULL SCREEN IMAGE OVERLAY TO GO STRAIGHT BACK TO YOUR ACTIVE MAP]
-        // =========================================================================================
         function exitFullscreenViewer() {
             document.getElementById('lightbox-viewer').style.display = 'none';
         } 
 
-        // GEOLOCATION ENGINE INITIALIZATION
+        // GEOLOCATION ENGINE
         map.locate({ watch: true, enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
 
         map.on('locationfound', function(e) {
             vehiclePos = e.latlng;
-            
             if (!vehicleMarker) {
                 vehicleMarker = L.marker(e.latlng, { icon: taxiIconStyle }).addTo(map);
                 map.setView(e.latlng, 17);
             } else {
                 vehicleMarker.setLatLng(e.latlng);
             } 
-
             if (trackVehicleView) {
                 map.setView(e.latlng, 17);
             } 
-
             fetchAddressFromCoordinates(e.latlng);
         }); 
 
-        // PERSISTENT VIEWPORT RE-CENTER REDUNDANCY LOOP
         setInterval(() => {
             if (trackVehicleView && vehiclePos) {
                 map.setView(vehiclePos, 17);
@@ -405,8 +378,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: REVERSE GEOLOCATION ENGINE
-        // [PLAIN ENGLISH: CONVERTS GPS NUMBERS INTO REAL STREET NAMES AND HOUSE NUMBERS AUTOMATICALLY]
+        // REVERSE GEOLOCATION ENGINE
         // =========================================================================================
         function fetchAddressFromCoordinates(latlng, forcedCallback = null) {
             let distanceMoved = 0;
@@ -442,21 +414,11 @@
                 });
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: MODAL DISPLAY TRIGGER
-        // [PLAIN ENGLISH: DIMS THE MAP BACKGROUND AND SLIDES OPEN WHICHEVER MENU BOX YOU PRESSED]
-        // =========================================================================================
         function showModal(id) {
             document.getElementById('screen-overlay').style.display = 'block';
             document.getElementById(id).style.display = 'block';
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: GLOBAL MODAL CLOSURE SUBROUTINE
-        // [PLAIN ENGLISH: CLOSES OUT ALL OPEN MENUS INSTANTLY TO LEAVE YOUR DRIVING WORKSPACE CLEAN]
-        // =========================================================================================
         function hideModals() {
             document.getElementById('screen-overlay').style.display = 'none';
             document.querySelectorAll('.driver-modal').forEach(m => m.style.display = 'none');
@@ -465,11 +427,6 @@
             activeRawTargetUrl = "";
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: VEHICLE VIEW RE-CENTER TRACKER
-        // [PLAIN ENGLISH: SNAPS MAP AUTOMATICALLY BACK ONTO TAXI CAR ICON AND KEEPS IT PINNED IN THE CENTER]
-        // =========================================================================================
         function handleRecenter() {
             trackVehicleView = true;
             const btn = document.getElementById('lock-center-btn');
@@ -480,11 +437,6 @@
             }
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: AUDIO MUTE MANAGEMENT INTERFACE
-        // [PLAIN ENGLISH: SWITCHES THE VOICE ALERTS ENGINE ON OR OFF AND TURNS THE BUTTON ALARM RED]
-        // =========================================================================================
         function handleMuteToggle() {
             audioMuted = !audioMuted;
             const btn = document.getElementById('mute-toggle-btn');
@@ -499,8 +451,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: DISPATCH PASSENGER FLAG MARKER
-        // [PLAIN ENGLISH: DROPS A PASSENGER OR HOTEL PIN AT CURRENT COORDINATES AND TRIGGERS VOICE DISPATCH]
+        // DISPATCH PASSENGER FLAG MARKER
         // =========================================================================================
         function dropFlagDirect(selectionValue) {
             hideModals(); 
@@ -518,7 +469,6 @@
 
                 const flagMarker = L.marker(targetPos, { icon: redManIcon }).addTo(map);
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName;
-                
                 const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${targetPos.lat},${targetPos.lng}`;
 
                 let headerLabel = `<strong style="color:#ff3b30;">FLAG WAITING</strong>`;
@@ -543,8 +493,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: CAUTION STAGE 1 ROUTER
-        // [PLAIN ENGLISH: RECORDS DELAY CATEGORY CHOSEN AND SWAPS DIRECTLY TO DIRECTION SELECTION BOX]
+        // CAUTION LOGIC SUBROUTINES
         // =========================================================================================
         function selectCautionType(type) {
             chosenCautionType = type;
@@ -552,11 +501,6 @@
             showModal('caution-dir-pop');
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: PROJECT CAUTION ANCHOR ON MAP
-        // [PLAIN ENGLISH: DRAWS A SOLID YELLOW CIRCULAR DELAY ALERT POINT EXACTLY WHERE CAB IS LOCATED]
-        // =========================================================================================
         function dropCautionMarker(directionValue) {
             hideModals(); 
             if (!vehiclePos) return; 
@@ -588,53 +532,54 @@
 
 
         // =========================================================================================
-        // LANDMARK: POLICE STAGE 1 ROUTER
-        // [PLAIN ENGLISH: SAVES ENFORCEMENT THREAT TYPE AND SLIDES WINDOW TO COMPASS ORIENTATION CHOICES]
+        // INTEGRATED REBUILT POLICE PIPELINE SNIPPET
         // =========================================================================================
         function selectPoliceType(type) {
-            chosenPoliceType = type;
+            chosenPoliceType = type.toLowerCase().trim(); // Guarantees case-insensitivity match
             hideModals();
             showModal('police-dir-pop');
         } 
 
-
-        // =========================================================================================
-        // LANDMARK: PROJECT POLICE ENFORCEMENT ZONE
-        // [PLAIN ENGLISH: DROPS A SOLID BLUE RADAR PIN POINT AND SENDS TEXT STRINGS TO BLUETOOTH ENGINES]
-        // =========================================================================================
         function dropPoliceMarker(directionValue) {
             hideModals(); 
             if (!vehiclePos) return; 
 
             const targetPos = vehiclePos;
-            const typeLabel = chosenPoliceType;
+            const typeLabel = chosenPoliceType; 
             const directionLabel = directionValue; 
 
             fetchAddressFromCoordinates(targetPos, function() {
-                const dynamicMarker = L.circleMarker(targetPos, {
-                    color: '#0044cc',
-                    fillColor: '#007aff',
-                    fillOpacity: 1.0, 
-                    weight: 3,
-                    radius: 14
-                }).addTo(map); 
+                // Generates custom HTML div layout containing the Policeman vector icon
+                const policeIcon = L.divIcon({
+                    className: 'police-officer-icon',
+                    html: '👮',
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
 
+                // Spawns the marker onto the map grid layout
+                const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
 
-                dynamicMarker.bindPopup(`
-                    <strong style="color:#007aff;">POLICE REPORTED</strong><br>
-                    <strong>Type:</strong> ${typeLabel} (${directionLabel})<br>
+                officerMarker.bindPopup(`
+                    <strong style="color:#007aff;">POLICE ENFORCEMENT</strong><br>
+                    <strong>Type:</strong> ${typeLabel.toUpperCase()} (${directionLabel})<br>
                     <span>Location: ${completeAddress}</span>
                 `).openPopup(); 
 
+                // Dispatch to the speech engine
                 dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
+
+                // AUTOMATIC CLEANUP RUNNER: Destroys marker completely after 30 minutes (1800000 ms)
+                setTimeout(() => {
+                    map.removeLayer(officerMarker);
+                }, 1800000);
             });
         } 
 
 
         // =========================================================================================
-        // LANDMARK: AUDIO ADDRESS COUPLES STRING CONVERTER
-        // [PLAIN ENGLISH: SPLITS 3 OR 4-DIGIT HOUSE CODES INTO NUMBER PAIRS SO BLUETOOTH READS IT PROPERLY]
+        // AUDIO ADDRESS CONVERTER
         // =========================================================================================
         function breakHouseNumbersIntoCouples(numberStr) {
             if (!numberStr || isNaN(numberStr)) return numberStr;
@@ -660,8 +605,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: CENTRAL TEXT-TO-SPEECH BROADCAST MACHINE
-        // [PLAIN ENGLISH: FLUSHES INTERCOM BUFFER AND SENDS THE NARRATION ALERT VIA 1.5s BLUETOOTH DELAY]
+        // CENTRAL TEXT-TO-SPEECH BROADCAST MACHINE
         // =========================================================================================
         function dispatchAudioNarration(category, payload) {
             const spokenHouseNumber = breakHouseNumbersIntoCouples(currentAddressData.houseNumber);
@@ -679,13 +623,19 @@
             else if (category === 'Caution') {
                 finalSpeechString = `One ${payload.type.toLowerCase()} reported ahead ${payload.direction.toLowerCase()} at ${addressAudioString}`;
             } 
+            // FULLY REWRITTEN VOICE ROUTING SCHEDULER
             else if (category === 'Police') {
-                if (payload.type === 'Emergency') {
-                    finalSpeechString = `One police reported ahead ${payload.direction.toLowerCase()} at ${addressAudioString} emergency emergency`;
-                } else if (payload.type === 'Hidden setup') {
-                    finalSpeechString = `One police reported ahead ${payload.direction.toLowerCase()} at ${addressAudioString} they're hiding they're hiding`;
-                } else {
-                    finalSpeechString = `One police reported ahead ${payload.direction.toLowerCase()} at ${addressAudioString} radar radar`;
+                const speechDirection = payload.direction.toLowerCase();
+                
+                if (payload.type === 'emergency') {
+                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} emergency`;
+                } 
+                else if (payload.type === 'hidden') {
+                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} they are hiding they are hiding`;
+                } 
+                else {
+                    // Safe catch-all fallback for 'radar'
+                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} Radar Radar`;
                 }
             } 
 
@@ -705,8 +655,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: INSTANT AUDIO CACHE REPLAY SUBROUTINE
-        // [PLAIN ENGLISH: INSTANTLY REPLAYS THE LAST DISPATCHED MESSAGE STORED INSIDE LOG MEMORY CHIPS]
+        // INSTANT AUDIO REPLAY
         // =========================================================================================
         function replayLastAudioNarration() {
             if (!lastSpokenSpeechString) return;
@@ -723,8 +672,7 @@
 
 
         // =========================================================================================
-        // LANDMARK: HARDWARE DISPLAY ANTI-BLACKOUT ENGINE
-        // [PLAIN ENGLISH: BACK-LINKS TO SMARTPHONE SYSTEM SETTINGS TO PREVENT SCREEN SLEEP MODES ON SHIFT]
+        // SCREEN ANTI-BLACKOUT WAKELOCK
         // =========================================================================================
         async function maintainScreenWakeLock() {
             try {
