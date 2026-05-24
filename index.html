@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Yellow Cab Companion Pro V9</title>
+    <title>Yellow Cab Companion Pro V9 - Sandbox Simulator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; }
@@ -34,6 +34,9 @@
         /* Custom Pure CSS Taxi Moving Element */
         .taxi-vector-icon { background: #ffd100; border: 2px solid #000; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); text-align: center; font-weight: bold; font-size: 10px; line-height: 24px; color: black; }
         .taxi-vector-icon::after { content: ''; position: absolute; top: -5px; left: 6px; width: 10px; height: 4px; background: black; border-radius: 1px; } 
+
+        /* Simulated Taxis Icon Markers Style */
+        .sim-taxi-vector-icon { background: #1c1c1e; border: 2px solid #ffd100; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); text-align: center; font-weight: bold; font-size: 9px; line-height: 24px; color: #ffd100; }
 
         /* Custom Drop Markers - SOLID COLORS */
         .red-man-icon { font-size: 34px; text-align: center; line-height: 34px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.6)); }
@@ -162,7 +165,7 @@
             <button class="btn-caution-opt" onclick="dropCautionMarker('Southbound')">South</button>
             <button class="btn-caution-opt" onclick="dropCautionMarker('Eastbound')">East</button>
             <button class="btn-caution-opt" onclick="dropCautionMarker('Westbound')">West</button>
-            <button class="btn-caution-opt full-width-btn" onclick="dropCautionMarker('All Directions')">All Directions</button>
+            <button class="btn-caution-opt_full-width-btn" onclick="dropCautionMarker('All Directions')">All Directions</button>
         </div>
     </div> 
 
@@ -398,58 +401,60 @@
             const directionLabel = directionValue; 
 
             fetchAddressFromCoordinates(targetPos, function() {
-                let cautionIconHtml = "";
-                let classLabel = "";
-                let anchorOffsets = [15, 15];
-                let customSize = [30, 30];
-
-                // Check condition types and assign specific emoji symbols and sizes
-                if (typeLabel === 'Mild traffic') {
-                    cautionIconHtml = "🚘🚘";
-                    classLabel = "caution-traffic-icon";
-                    customSize = [50, 26];
-                    anchorOffsets = [25, 13];
-                } else if (typeLabel === 'Heavy traffic') {
-                    cautionIconHtml = "🚘🚘🚘🚘";
-                    classLabel = "caution-traffic-icon";
-                    customSize = [90, 26];
-                    anchorOffsets = [45, 13];
-                } else if (typeLabel === 'Accident') {
-                    cautionIconHtml = "💥🚗";
-                    classLabel = "caution-accident-icon";
-                    customSize = [44, 34];
-                    anchorOffsets = [22, 17];
-                } else if (typeLabel === 'Road closure') {
-                    cautionIconHtml = "🚧";
-                    classLabel = "caution-closure-icon";
-                    customSize = [34, 34];
-                    anchorOffsets = [17, 17];
-                }
-
-                const cautionDivIcon = L.divIcon({
-                    className: classLabel,
-                    html: cautionIconHtml,
-                    iconSize: customSize,
-                    iconAnchor: anchorOffsets
-                });
-
-                const dynamicMarker = L.marker(targetPos, { icon: cautionDivIcon }).addTo(map); 
-                const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
-
-                dynamicMarker.bindPopup(`
-                    <strong style="color:#b38f00;">${typeLabel.toUpperCase()}</strong><br>
-                    <strong>Direction:</strong> ${directionLabel}<br>
-                    <span>Location: ${completeAddress}</span>
-                `).openPopup(); 
-
-                dispatchAudioNarration('Caution', { type: typeLabel, direction: directionLabel });
-
-                // Keep map clear by auto-removing the marker after 20 minutes
-                setTimeout(() => {
-                    map.removeLayer(dynamicMarker);
-                }, 1200000);
+                createCautionMarkerOnMap(typeLabel, directionLabel, targetPos);
             });
         } 
+
+        function createCautionMarkerOnMap(typeLabel, directionLabel, targetPos) {
+            let cautionIconHtml = "";
+            let classLabel = "";
+            let anchorOffsets = [15, 15];
+            let customSize = [30, 30];
+
+            if (typeLabel === 'Mild traffic') {
+                cautionIconHtml = "🚘🚘";
+                classLabel = "caution-traffic-icon";
+                customSize = [50, 26];
+                anchorOffsets = [25, 13];
+            } else if (typeLabel === 'Heavy traffic') {
+                cautionIconHtml = "🚘🚘🚘🚘";
+                classLabel = "caution-traffic-icon";
+                customSize = [90, 26];
+                anchorOffsets = [45, 13];
+            } else if (typeLabel === 'Accident') {
+                cautionIconHtml = "💥🚗";
+                classLabel = "caution-accident-icon";
+                customSize = [44, 34];
+                anchorOffsets = [22, 17];
+            } else if (typeLabel === 'Road closure') {
+                cautionIconHtml = "🚧";
+                classLabel = "caution-closure-icon";
+                customSize = [34, 34];
+                anchorOffsets = [17, 17];
+            }
+
+            const cautionDivIcon = L.divIcon({
+                className: classLabel,
+                html: cautionIconHtml,
+                iconSize: customSize,
+                iconAnchor: anchorOffsets
+            });
+
+            const dynamicMarker = L.marker(targetPos, { icon: cautionDivIcon }).addTo(map); 
+            const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
+
+            dynamicMarker.bindPopup(`
+                <strong style="color:#b38f00;">${typeLabel.toUpperCase()}</strong><br>
+                <strong>Direction:</strong> ${directionLabel}<br>
+                <span>Location: ${completeAddress}</span>
+            `).openPopup(); 
+
+            dispatchAudioNarration('Caution', { type: typeLabel, direction: directionLabel });
+
+            setTimeout(() => {
+                map.removeLayer(dynamicMarker);
+            }, 1200000);
+        }
 
 
         // =========================================================================================
@@ -470,29 +475,33 @@
             const directionLabel = directionValue; 
 
             fetchAddressFromCoordinates(targetPos, function() {
-                const policeIcon = L.divIcon({
-                    className: 'police-officer-icon',
-                    html: '👮',
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
-                });
-
-                const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
-                const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
-
-                officerMarker.bindPopup(`
-                    <strong style="color:#007aff;">POLICE ENFORCEMENT</strong><br>
-                    <strong>Type:</strong> ${typeLabel.toUpperCase()} (${directionLabel})<br>
-                    <span>Location: ${completeAddress}</span>
-                `).openPopup(); 
-
-                dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
-
-                setTimeout(() => {
-                    map.removeLayer(officerMarker);
-                }, 1800000);
+                createPoliceMarkerOnMap(typeLabel, directionLabel, targetPos);
             });
         } 
+
+        function createPoliceMarkerOnMap(typeLabel, directionLabel, targetPos) {
+            const policeIcon = L.divIcon({
+                className: 'police-officer-icon',
+                html: '👮',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+
+            const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
+            const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
+
+            officerMarker.bindPopup(`
+                <strong style="color:#007aff;">POLICE ENFORCEMENT</strong><br>
+                <strong>Type:</strong> ${typeLabel.toUpperCase()} (${directionLabel})<br>
+                <span>Location: ${completeAddress}</span>
+            `).openPopup(); 
+
+            dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
+
+            setTimeout(() => {
+                map.removeLayer(officerMarker);
+            }, 1800000);
+        }
 
 
         // =========================================================================================
@@ -605,6 +614,123 @@
             if (wakeLockToken !== null && document.visibilityState === 'visible') {
                 maintainScreenWakeLock();
             }
+        });
+
+
+        // =========================================================================================
+        // 🚀 SANDBOX SIMULATOR ENGINE (10 ACTIVE ROAMING TAXIS & ALERTS)
+        // =========================================================================================
+        let simulatedTaxis = [];
+        let simMarkersMap = {}; 
+
+        function initTaxiSimulator() {
+            console.log("Sandbox Engine Online: Generating 10 Roaming Simulator Vehicles...");
+
+            // Base coordinates for central Vancouver grid
+            const vanLat = 49.2611;
+            const vanLng = -123.1281;
+
+            // Generate 10 vehicles clustered around the user
+            simulatedTaxis = Array.from({ length: 10 }, (_, i) => {
+                const idNum = i + 1;
+                return {
+                    id: `sim_cab_${idNum}`,
+                    label: `#${200 + idNum}`,
+                    lat: vanLat + (Math.random() - 0.5) * 0.03,
+                    lng: vanLng + (Math.random() - 0.5) * 0.04,
+                    speed: 0.00015 
+                };
+            });
+
+            // Loop 1: Smoothly update taxi positions on map every 3.5 seconds
+            setInterval(() => {
+                simulatedTaxis.forEach(taxi => {
+                    // Grid movement adjustments
+                    taxi.lat += (Math.random() - 0.5) * taxi.speed;
+                    taxi.lng += (Math.random() - 0.5) * taxi.speed;
+
+                    updateSimulatedMarkerOnMap(taxi);
+                });
+            }, 3500);
+
+            // Loop 2: Random taxi triggers an automated caution/police report every 30 seconds
+            setInterval(() => {
+                if (simulatedTaxis.length === 0) return;
+
+                // Pick a random virtual cab
+                const randomTaxi = simulatedTaxis[Math.floor(Math.random() * simulatedTaxis.length)];
+                const position = L.latLng(randomTaxi.lat, randomTaxi.lng);
+
+                const alertCategories = ['Caution', 'Police'];
+                const selectedCategory = alertCategories[Math.floor(Math.random() * alertCategories.length)];
+                const directions = ['Northbound', 'Southbound', 'Eastbound', 'Westbound'];
+                const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+
+                // Temporarily mock address fields to mimic real GPS tracking loops
+                const oldHouse = currentAddressData.houseNumber;
+                const oldStreet = currentAddressData.streetName;
+
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.lat}&lon=${position.lng}&zoom=18&addressdetails=1`;
+
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.address) {
+                            currentAddressData.streetName = data.address.road || data.address.pedestrian || "Main Route";
+                            currentAddressData.houseNumber = data.address.house_number || "";
+                        }
+
+                        if (selectedCategory === 'Caution') {
+                            const types = ['Mild traffic', 'Heavy traffic', 'Accident', 'Road closure'];
+                            const randomType = types[Math.floor(Math.random() * types.length)];
+                            console.log(`[SIMULATION ALERT] Cab ${randomTaxi.label} dropped a ${randomType} marker.`);
+                            createCautionMarkerOnMap(randomType, randomDirection, position);
+                        } else {
+                            const types = ['radar', 'emergency', 'hidden'];
+                            const randomType = types[Math.floor(Math.random() * types.length)];
+                            console.log(`[SIMULATION ALERT] Cab ${randomTaxi.label} dropped a Police (${randomType}) marker.`);
+                            createPoliceMarkerOnMap(randomType, randomDirection, position);
+                        }
+
+                        // Restore main driver geolocation references smoothly
+                        setTimeout(() => {
+                            currentAddressData.houseNumber = oldHouse;
+                            currentAddressData.streetName = oldStreet;
+                        }, 2000);
+                    }).catch(() => {
+                        // Fallback tracking if lookup hits network throttle caps
+                        currentAddressData.streetName = "Highway Route";
+                        currentAddressData.houseNumber = "";
+                        createCautionMarkerOnMap('Heavy traffic', randomDirection, position);
+                    });
+
+            }, 30000);
+        }
+
+        // Draws and manages the physical grey/yellow icons for the 10 sandbox taxis
+        function updateSimulatedMarkerOnMap(taxi) {
+            const customHtml = `<div style="font-weight:900; font-size:10px; color:#ffd100;">${taxi.label}</div>`;
+            
+            const simIconStyle = L.divIcon({
+                className: 'sim-taxi-vector-icon',
+                html: customHtml,
+                iconSize: [30, 26],
+                iconAnchor: [15, 13]
+            });
+
+            if (!simMarkersMap[taxi.id]) {
+                // Spawn a new marker icon
+                simMarkersMap[taxi.id] = L.marker([taxi.lat, taxi.lng], { icon: simIconStyle }).addTo(map);
+                simMarkersMap[taxi.id].bindPopup(`<strong>Simulated Taxi Unit</strong><br>Driver ID: ${taxi.label}<br>Status: Active Roaming`);
+            } else {
+                // Glide existing marker icon to new location points smoothly
+                simMarkersMap[taxi.id].setLatLng([taxi.lat, taxi.lng]);
+            }
+        }
+
+        // Auto-run the simulator immediately once sandbox page mounts
+        window.addEventListener('DOMContentLoaded', () => {
+            initTaxiSimulator();
         });
     </script>
 </body>
