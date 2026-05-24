@@ -198,7 +198,7 @@
             touchZoom: true,
             doubleClickZoom: true,
             scrollWheelZoom: true
-        }).setView([49.2611, -123.1281], 12); // Slightly zoomed out to view multiple cities
+        }).setView([49.2611, -123.1281], 11); // Set slightly further out to monitor all three cities
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); 
 
@@ -227,7 +227,7 @@
         }); 
 
         // =========================================================================================
-        // CAMERA ACTION CONTROLLER (NEW TAB BYPASS MECHANISM)
+        // CAMERA ACTION CONTROLLER
         // =========================================================================================
         function openCameraListMenu() {
             showModal('camera-menu-pop');
@@ -329,14 +329,13 @@
 
 
         // =========================================================================================
-        // DISPATCH PASSENGER FLAG MARKER (REUSABLE SUBROUTINE)
+        // DISPATCH PASSENGER FLAG MARKER (FIXED: SEPARATED USER DROPS FROM ENGINE SIMULATIONS)
         // =========================================================================================
-        function dropFlagDirect(selectionValue, customPos = null) {
+        function dropFlagDirect(selectionValue) {
             hideModals(); 
-            const targetPos = customPos || vehiclePos; 
-            if (!targetPos) return; 
+            if (!vehiclePos) return; 
 
-            fetchAddressFromCoordinates(targetPos, function() {
+            fetchAddressFromCoordinates(vehiclePos, function() {
                 const redManIcon = L.divIcon({
                     className: 'red-man-icon',
                     html: selectionValue === 'Hotel Driveway' ? '🏨' : '🚶',
@@ -344,9 +343,9 @@
                     iconAnchor: [17, 32]
                 }); 
 
-                const flagMarker = L.marker(targetPos, { icon: redManIcon }).addTo(map);
+                const flagMarker = L.marker(vehiclePos, { icon: redManIcon }).addTo(map);
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName;
-                const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${targetPos.lat},${targetPos.lng}`;
+                const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${vehiclePos.lat},${vehiclePos.lng}`;
 
                 let headerLabel = `<strong style="color:#ff3b30;">FLAG WAITING</strong>`;
                 if (selectionValue === 'Hotel Driveway') {
@@ -358,20 +357,35 @@
                     <strong>Placement:</strong> ${selectionValue}<br>
                     <span>Location: ${completeAddress}</span><br><br>
                     <a href="${navigationUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:5px; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
-                `);
+                `).openPopup(); 
 
-                // Automatically pop open if it's nearby
-                if (!customPos) {
-                    flagMarker.openPopup();
-                    dispatchAudioNarration('Flag', selectionValue); 
-                }
+                dispatchAudioNarration('Flag', selectionValue); 
 
-                // Auto-clear flags after 5 minutes to prevent map clutter
-                setTimeout(() => {
-                    map.removeLayer(flagMarker);
-                }, 300000); 
+                setTimeout(() => { map.removeLayer(flagMarker); }, 300000); 
             });
         } 
+
+        // NEW SUITE: Isolated injection engine specifically for background simulator items
+        function injectSimulatedFlag(type, latlng, cabLabel) {
+            const redManIcon = L.divIcon({
+                className: 'red-man-icon',
+                html: type === 'Hotel Driveway' ? '🏨' : '🚶',
+                iconSize: [34, 34],
+                iconAnchor: [17, 32]
+            });
+
+            const marker = L.marker([latlng.lat, latlng.lng], { icon: redManIcon }).addTo(map);
+            const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${latlng.lat},${latlng.lng}`;
+
+            marker.bindPopup(`
+                <strong style="color:#ff3b30;">FLAG DROP (SIMULATOR)</strong><br>
+                <strong>Reported By:</strong> ${cabLabel}<br>
+                <strong>Type:</strong> ${type}<br>
+                <span>Coordinates: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}</span><br><br>
+                <a href="${navigationUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
+            `);
+            setTimeout(() => { map.removeLayer(marker); }, 180000);
+        }
 
 
         // =========================================================================================
@@ -387,61 +401,56 @@
             hideModals(); 
             if (!vehiclePos) return; 
 
-            const targetPos = vehiclePos;
-            const typeLabel = chosenCautionType;
-            const directionLabel = directionValue; 
-
-            fetchAddressFromCoordinates(targetPos, function() {
+            fetchAddressFromCoordinates(vehiclePos, function() {
                 let cautionIconHtml = "";
                 let classLabel = "";
                 let anchorOffsets = [15, 15];
                 let customSize = [30, 30];
 
-                if (typeLabel === 'Mild traffic') {
-                    cautionIconHtml = "🚘🚘";
-                    classLabel = "caution-traffic-icon";
-                    customSize = [50, 26];
-                    anchorOffsets = [25, 13];
-                } else if (typeLabel === 'Heavy traffic') {
-                    cautionIconHtml = "🚘🚘🚘🚘";
-                    classLabel = "caution-traffic-icon";
-                    customSize = [90, 26];
-                    anchorOffsets = [45, 13];
-                } else if (typeLabel === 'Accident') {
-                    cautionIconHtml = "💥🚗";
-                    classLabel = "caution-accident-icon";
-                    customSize = [44, 34];
-                    anchorOffsets = [22, 17];
-                } else if (typeLabel === 'Road closure') {
-                    cautionIconHtml = "🚧";
-                    classLabel = "caution-closure-icon";
-                    customSize = [34, 34];
-                    anchorOffsets = [17, 17];
+                if (chosenCautionType === 'Mild traffic') {
+                    cautionIconHtml = "🚘🚘"; classLabel = "caution-traffic-icon"; customSize = [50, 26]; anchorOffsets = [25, 13];
+                } else if (chosenCautionType === 'Heavy traffic') {
+                    cautionIconHtml = "🚘🚘🚘🚘"; classLabel = "caution-traffic-icon"; customSize = [90, 26]; anchorOffsets = [45, 13];
+                } else if (chosenCautionType === 'Accident') {
+                    cautionIconHtml = "💥🚗"; classLabel = "caution-accident-icon"; customSize = [44, 34]; anchorOffsets = [22, 17];
+                } else if (chosenCautionType === 'Road closure') {
+                    cautionIconHtml = "🚧"; classLabel = "caution-closure-icon"; customSize = [34, 34]; anchorOffsets = [17, 17];
                 }
 
-                const cautionDivIcon = L.divIcon({
-                    className: classLabel,
-                    html: cautionIconHtml,
-                    iconSize: customSize,
-                    iconAnchor: anchorOffsets
-                });
-
-                const dynamicMarker = L.marker(targetPos, { icon: cautionDivIcon }).addTo(map); 
+                const cautionDivIcon = L.divIcon({ className: classLabel, html: cautionIconHtml, iconSize: customSize, iconAnchor: anchorOffsets });
+                const dynamicMarker = L.marker(vehiclePos, { icon: cautionDivIcon }).addTo(map); 
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
 
                 dynamicMarker.bindPopup(`
-                    <strong style="color:#b38f00;">${typeLabel.toUpperCase()}</strong><br>
-                    <strong>Direction:</strong> ${directionLabel}<br>
+                    <strong style="color:#b38f00;">${chosenCautionType.toUpperCase()}</strong><br>
+                    <strong>Direction:</strong> ${directionValue}<br>
                     <span>Location: ${completeAddress}</span>
                 `).openPopup(); 
 
-                dispatchAudioNarration('Caution', { type: typeLabel, direction: directionLabel });
-
-                setTimeout(() => {
-                    map.removeLayer(dynamicMarker);
-                }, 1200000);
+                dispatchAudioNarration('Caution', { type: chosenCautionType, direction: directionValue });
+                setTimeout(() => { map.removeLayer(dynamicMarker); }, 1200000);
             });
         } 
+
+        // Simulation script bypass layout for Caution alerts
+        function injectSimulatedCaution(type, direction, latlng, cabLabel) {
+            let iconHtml = "🚧";
+            let classLbl = "caution-closure-icon";
+            let sz = [34, 34];
+            let anch = [17, 17];
+
+            if (type.includes('traffic')) { iconHtml = "🚘🚘"; classLbl = "caution-traffic-icon"; sz = [50, 26]; anch = [25, 13]; }
+            else if (type === 'Accident') { iconHtml = "💥🚗"; classLbl = "caution-accident-icon"; sz = [44, 34]; anch = [22, 17]; }
+
+            const divIcon = L.divIcon({ className: classLbl, html: iconHtml, iconSize: sz, iconAnchor: anch });
+            const marker = L.marker([latlng.lat, latlng.lng], { icon: divIcon }).addTo(map);
+            marker.bindPopup(`
+                <strong style="color:#b38f00;">${type.toUpperCase()} (SIM)</strong><br>
+                <strong>Reporter:</strong> ${cabLabel}<br>
+                <strong>Direction:</strong> ${direction}
+            `);
+            setTimeout(() => { map.removeLayer(marker); }, 180000);
+        }
 
 
         // =========================================================================================
@@ -457,11 +466,7 @@
             hideModals(); 
             if (!vehiclePos) return; 
 
-            const targetPos = vehiclePos;
-            const typeLabel = chosenPoliceType; 
-            const directionLabel = directionValue; 
-
-            fetchAddressFromCoordinates(targetPos, function() {
+            fetchAddressFromCoordinates(vehiclePos, function() {
                 const policeIcon = L.divIcon({
                     className: 'police-officer-icon',
                     html: '👮',
@@ -469,22 +474,32 @@
                     iconAnchor: [18, 18]
                 });
 
-                const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
+                const officerMarker = L.marker(vehiclePos, { icon: policeIcon }).addTo(map);
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
 
                 officerMarker.bindPopup(`
                     <strong style="color:#007aff;">POLICE ENFORCEMENT</strong><br>
-                    <strong>Type:</strong> ${typeLabel.toUpperCase()} (${directionLabel})<br>
+                    <strong>Type:</strong> ${chosenPoliceType.toUpperCase()} (${directionValue})<br>
                     <span>Location: ${completeAddress}</span>
                 `).openPopup(); 
 
-                dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
-
-                setTimeout(() => {
-                    map.removeLayer(officerMarker);
-                }, 1800000);
+                dispatchAudioNarration('Police', { type: chosenPoliceType, direction: directionValue });
+                setTimeout(() => { map.removeLayer(officerMarker); }, 1800000);
             });
         } 
+
+        // Simulation script bypass layout for Police tracking alerts
+        function injectSimulatedPolice(type, direction, latlng, cabLabel) {
+            const policeIcon = L.divIcon({ className: 'police-officer-icon', html: '👮', iconSize: [36, 36], iconAnchor: [18, 18] });
+            const marker = L.marker([latlng.lat, latlng.lng], { icon: policeIcon }).addTo(map);
+            marker.bindPopup(`
+                <strong style="color:#007aff;">POLICE ZONE (SIM)</strong><br>
+                <strong>Unit Reporting:</strong> ${cabLabel}<br>
+                <strong>Type:</strong> ${type.toUpperCase()}<br>
+                <strong>Direction:</strong> ${direction}
+            `);
+            setTimeout(() => { map.removeLayer(marker); }, 180000);
+        }
 
 
         // =========================================================================================
@@ -492,7 +507,6 @@
         // =========================================================================================
         function breakHouseNumbersIntoCouples(numberStr) {
             if (!numberStr || isNaN(numberStr)) return numberStr;
-            
             if (numberStr.length === 4) {
                 const leadingPair = parseInt(numberStr.substring(0, 2), 10);
                 const trailingPair = parseInt(numberStr.substring(2, 4), 10);
@@ -500,7 +514,6 @@
                 if (trailingPair < 10) return `${leadingPair} oh ${trailingPair}`;
                 return `${leadingPair} ${trailingPair}`;
             }
-            
             if (numberStr.length === 3) {
                 const leadingDigit = parseInt(numberStr.substring(0, 1), 10);
                 const trailingPair = parseInt(numberStr.substring(1, 3), 10);
@@ -508,7 +521,6 @@
                 if (trailingPair < 10) return `${leadingDigit} oh ${trailingPair}`;
                 return `${leadingDigit} ${trailingPair}`;
             } 
-
             return numberStr;
         } 
 
@@ -519,7 +531,6 @@
         function dispatchAudioNarration(category, payload) {
             const spokenHouseNumber = breakHouseNumbersIntoCouples(currentAddressData.houseNumber);
             const addressAudioString = spokenHouseNumber ? `${spokenHouseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName;
-            
             let finalSpeechString = "";
             
             if (category === 'Flag') {
@@ -534,20 +545,12 @@
             } 
             else if (category === 'Police') {
                 const speechDirection = payload.direction.toLowerCase();
-                
-                if (payload.type === 'emergency') {
-                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} emergency`;
-                } 
-                else if (payload.type === 'hidden') {
-                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} they are hiding they are hiding`;
-                } 
-                else {
-                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} Radar Radar`;
-                }
+                if (payload.type === 'emergency') { finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} emergency`; } 
+                else if (payload.type === 'hidden') { finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} they are hiding they are hiding`; } 
+                else { finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} Radar Radar`; }
             } 
 
             lastSpokenSpeechString = finalSpeechString;
-
             if (audioMuted) return; 
 
             const clearHardwareBuffer = new SpeechSynthesisUtterance("");
@@ -560,16 +563,10 @@
             }, 1500);
         } 
 
-
-        // =========================================================================================
-        // INSTANT AUDIO REPLAY
-        // =========================================================================================
         function replayLastAudioNarration() {
             if (!lastSpokenSpeechString) return;
-            
             const clearHardwareBuffer = new SpeechSynthesisUtterance("");
             window.speechSynthesis.speak(clearHardwareBuffer); 
-
             setTimeout(() => {
                 const utterance = new SpeechSynthesisUtterance(lastSpokenSpeechString);
                 utterance.rate = 1.0; 
@@ -579,72 +576,80 @@
 
 
         // =========================================================================================
-        // 🚀 SCATTERED FLEET SIMULATOR ENGINE (20 VEHICLES IN MULTIPLE CITIES)
+        // 🚀 SIMULATOR ENGINE (FIXED: FAST BYPASS WITH MULTI-ALERT CAPABILITIES)
         // =========================================================================================
         let simulatedTaxis = [];
         let simMarkersMap = {};
 
         function initTaxiSimulator() {
-            console.log("Deploying 20 Multi-City Simulated Vehicles...");
+            console.log("Activating 20 Multi-City Autonomous Vehicles...");
 
-            // Regional city anchors
             const hubs = [
-                { lat: 49.2611, lng: -123.1281 }, // Vancouver Core
+                { lat: 49.2611, lng: -123.1281 }, // Vancouver
                 { lat: 49.1666, lng: -123.1336 }, // Richmond
                 { lat: 49.1913, lng: -122.8490 }  // Surrey
             ];
 
-            // Generate 20 vehicles distributed randomly across the three cities
             simulatedTaxis = Array.from({ length: 20 }, (_, i) => {
                 const idNum = i + 1;
-                const assignedHub = hubs[i % hubs.length]; // Split evenly among cities
-                
+                const assignedHub = hubs[i % hubs.length];
                 return {
                     id: `sim_cab_${idNum}`,
                     label: `YC${100 + idNum}`,
-                    lat: assignedHub.lat + (Math.random() - 0.5) * 0.06,
-                    lng: assignedHub.lng + (Math.random() - 0.5) * 0.08,
-                    speed: 0.00015 
+                    lat: assignedHub.lat + (Math.random() - 0.5) * 0.05,
+                    lng: assignedHub.lng + (Math.random() - 0.5) * 0.07,
+                    speed: 0.00014 
                 };
             });
 
-            // Loop A: Animate the 20 cars moving smoothly on the grid
+            // Loop 1: Handle vehicle motion physics
             setInterval(() => {
                 simulatedTaxis.forEach(taxi => {
                     taxi.lat += (Math.random() - 0.5) * taxi.speed;
                     taxi.lng += (Math.random() - 0.5) * taxi.speed;
                     
-                    // Render/update their positions on map
-                    const customHtml = `<div style="font-weight:bold; font-size:9px; text-align:center; line-height:22px;">YC${taxi.id.split('_')[2]}</div>`;
-                    const simIcon = L.divIcon({
-                        className: 'taxi-vector-icon',
-                        html: customHtml,
-                        iconSize: [36, 24],
-                        iconAnchor: [18, 12]
-                    });
+                    const markerHtml = `<div style="font-weight:bold; font-size:9px; text-align:center; line-height:22px;">YC${taxi.id.split('_')[2]}</div>`;
+                    const simIcon = L.divIcon({ className: 'taxi-vector-icon', html: markerHtml, iconSize: [36, 24], iconAnchor: [18, 12] });
 
                     if (!simMarkersMap[taxi.id]) {
                         simMarkersMap[taxi.id] = L.marker([taxi.lat, taxi.lng], { icon: simIcon }).addTo(map);
-                        simMarkersMap[taxi.id].bindPopup(`<b>Simulated Unit</b><br>Vehicle Number: YC${taxi.id.split('_')[2]}`);
                     } else {
                         simMarkersMap[taxi.id].setLatLng([taxi.lat, taxi.lng]);
                     }
                 });
             }, 3000);
 
-            // Loop B: Automated high-frequency flag dropping from simulator cars
+            // Loop 2: Safe automated grid drops (Completely bypasses Nominatim Rate Limits!)
             setInterval(() => {
                 if (simulatedTaxis.length === 0) return;
 
-                // Pick an active simulated car randomly
                 const randomCab = simulatedTaxis[Math.floor(Math.random() * simulatedTaxis.length)];
-                const flagTypes = ['Northbound', 'Southbound', 'Eastbound', 'Westbound', 'Hotel Driveway'];
-                const randomType = flagTypes[Math.floor(Math.random() * flagTypes.length)];
+                const cabPos = { lat: randomCab.lat, lng: randomCab.lng };
 
-                // Drop an active navigation flag marker at their current moving coordinates
-                dropFlagDirect(randomType, { lat: randomCab.lat, lng: randomCab.lng });
-                console.log(`[SIMULATOR] Vehicle ${randomCab.label} dropped a Flag in the grid.`);
-            }, 8000); // New flags drop every 8 seconds so you can click and test the routing button immediately!
+                // Randomly decide which type of warning payload to scatter on the UI map
+                const eventRoulette = Math.random();
+                const directions = ['Northbound', 'Southbound', 'Eastbound', 'Westbound', 'All Directions'];
+                const randDir = directions[Math.floor(Math.random() * directions.length)];
+
+                if (eventRoulette < 0.50) {
+                    // 50% chance: Drop a Passenger Flag
+                    const flagTypes = ['Northbound', 'Southbound', 'Northeast Corner', 'Hotel Driveway'];
+                    const randType = flagTypes[Math.floor(Math.random() * flagTypes.length)];
+                    injectSimulatedFlag(randType, cabPos, randomCab.label);
+                } 
+                else if (eventRoulette < 0.80) {
+                    // 30% chance: Drop a Traffic/Accident Caution
+                    const cautionTypes = ['Mild traffic', 'Heavy traffic', 'Accident', 'Road closure'];
+                    const randCaution = cautionTypes[Math.floor(Math.random() * cautionTypes.length)];
+                    injectSimulatedCaution(randCaution, randDir, cabPos, randomCab.label);
+                } 
+                else {
+                    // 20% chance: Drop a Police Threat Zone
+                    const policeTypes = ['radar', 'emergency', 'hidden'];
+                    const randPolice = policeTypes[Math.floor(Math.random() * policeTypes.length)];
+                    injectSimulatedPolice(randPolice, randDir, cabPos, randomCab.label);
+                }
+            }, 6000); // Fires every 6 seconds to generate a highly active testing map layout!
         }
 
 
@@ -653,12 +658,8 @@
         // =========================================================================================
         async function maintainScreenWakeLock() {
             try {
-                if ('wakeLock' in navigator) {
-                    wakeLockToken = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) {
-                console.log("Wake lock notice: " + err.message);
-            }
+                if ('wakeLock' in navigator) { wakeLockToken = await navigator.wakeLock.request('screen'); }
+            } catch (err) { console.log("Wake lock notice: " + err.message); }
         } 
 
         window.addEventListener('load', () => {
@@ -667,9 +668,7 @@
         }); 
 
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLockToken !== null && document.visibilityState === 'visible') {
-                maintainScreenWakeLock();
-            }
+            if (wakeLockToken !== null && document.visibilityState === 'visible') { maintainScreenWakeLock(); }
         });
     </script>
 </body>
