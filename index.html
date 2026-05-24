@@ -181,7 +181,7 @@
             <button class="btn-police-opt" onclick="dropPoliceMarker('Northbound')">North</button>
             <button class="btn-police-opt" onclick="dropPoliceMarker('Southbound')">South</button>
             <button class="btn-police-opt" onclick="dropPoliceMarker('Eastbound')">East</button>
-            <button class="btn-police-opt" onclick="dropPoliceMarker('Westbound')">West**</button>
+            <button class="btn-police-opt" onclick="dropPoliceMarker('Westbound')">West</button>
             <button class="btn-police-opt full-width-btn" onclick="dropPoliceMarker('All Directions')">All Directions</button>
         </div>
     </div> 
@@ -385,9 +385,7 @@
                 <a href="${navigationUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
             `);
             
-            // Trigger customized voice alert for simulated drop
             dispatchSimulatedAudioAlert('Flag', type, cabLabel);
-            
             setTimeout(() => { map.removeLayer(marker); }, 180000);
         }
 
@@ -454,9 +452,7 @@
                 <strong>Direction:</strong> ${direction}
             `);
             
-            // Trigger customized voice alert for simulated caution
             dispatchSimulatedAudioAlert('Caution', { type: type, direction: direction }, cabLabel);
-            
             setTimeout(() => { map.removeLayer(marker); }, 180000);
         }
 
@@ -507,9 +503,7 @@
                 <strong>Direction:</strong> ${direction}
             `);
             
-            // Trigger customized voice alert for simulated speed trap
             dispatchSimulatedAudioAlert('Police', { type: type, direction: direction }, cabLabel);
-            
             setTimeout(() => { map.removeLayer(marker); }, 180000);
         }
 
@@ -567,12 +561,10 @@
         } 
 
         // =========================================================================================
-        // NEW SUITE: SPECIAL SIMULATOR AUDIO BROADCASTER (Does not depend on GPS Address loops)
+        // SPECIAL SIMULATOR AUDIO BROADCASTER
         // =========================================================================================
         function dispatchSimulatedAudioAlert(category, payload, cabLabel) {
             let finalSpeechString = "";
-            
-            // Format cab names smoothly (e.g., "Y C 1 0 5") so screen readers say individual numbers
             const standardCabSpelling = cabLabel.split('').join(' ');
 
             if (category === 'Flag') {
@@ -598,7 +590,6 @@
             executeSpeechBuffer(finalSpeechString);
         }
 
-        // Dedicated helper to clean the hardware speech channels cleanly
         function executeSpeechBuffer(textToSpeak) {
             if (audioMuted || !textToSpeak) return;
 
@@ -649,7 +640,7 @@
                 };
             });
 
-            // Loop 1: Handle vehicle motion physics
+            // Loop 1: Handle vehicle motion physics (Updates every 3 seconds)
             setInterval(() => {
                 simulatedTaxis.forEach(taxi => {
                     taxi.lat += (Math.random() - 0.5) * taxi.speed;
@@ -666,7 +657,7 @@
                 });
             }, 3000);
 
-            // Loop 2: Safe automated grid drops (Fires every 6 seconds)
+            // Loop 2: Safe automated grid drops (UPDATED: Fires every 30 seconds)
             setInterval(() => {
                 if (simulatedTaxis.length === 0) return;
 
@@ -697,7 +688,7 @@
                 } catch (err) {
                     console.log("Sim drop bypassed: " + err.message);
                 }
-            }, 6000); 
+            }, 30000); // 30000ms = 30 seconds
         }
 
 
