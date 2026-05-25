@@ -29,12 +29,6 @@
         .util-circle { width: 70px; height: 70px; border-radius: 50%; background: #ffffff; border: 3px solid #1c1c1e; color: #1c1c1e; font-weight: 900; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; text-align: center; }
         .util-circle.active-mute { background: #ff453a; color: white; border-color: white; }
         .util-circle.active-center { background: #34c759; color: white; border-color: white; } 
-        
-        /* Repeat Audio Button Style */
-        .util-circle.active-repeat { background: #5856d6; color: white; border-color: white; }
-        
-        /* Chat Box Log Toggle Button Style */
-        .util-circle.btn-chat-log { background: #f1f1f7; color: #1c1c1e; border: 3px solid #1c1c1e; }
 
         /* Custom Pure CSS Taxi Moving Element */
         .taxi-vector-icon { background: #ffd100; border: 2px solid #000; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); text-align: center; font-weight: bold; font-size: 10px; line-height: 24px; color: black; }
@@ -69,11 +63,13 @@
         /* Hotel Button Style Assertion */
         .btn-flag-hotel { grid-column: span 2; background: #5856d6 !important; color: #ffffff !important; border: 3px solid #5856d6; }
 
-        /* Utility Menu Modal Adjustments */
-        .utility-menu-grid { width: 320px; }
-        .btn-caution-menu { background: #ffcc00 !important; color: #000000 !important; border: 3px solid #ffcc00; }
-        .btn-cameras-menu { background: #34c759 !important; color: #ffffff !important; border: 3px solid #34c759; }
-        .btn-feedback-menu { background: #e5e5ea !important; color: #1c1c1e !important; border: 3px solid #1c1c1e; }
+        /* BRIGHT THEMED UTILITY PANEL MENU BUTTONS */
+        .utility-menu-grid { width: 340px; }
+        .btn-caution-menu { background: #ffcc00 !important; color: #000000 !important; border: 3px solid #e6b800 !important; }
+        .btn-cameras-menu { background: #34c759 !important; color: #ffffff !important; border: 3px solid #28a745 !important; }
+        .btn-replay-menu { background: #5856d6 !important; color: #ffffff !important; border: 3px solid #433fa7 !important; }
+        .btn-logs-menu { background: #00c7be !important; color: #ffffff !important; border: 3px solid #00a39c !important; }
+        .btn-feedback-menu { background: #ff9500 !important; color: #ffffff !important; border: 3px solid #cc7700 !important; }
 
         /* Caution Menu Styles (Solid Yellow) */
         .caution-grid { width: 310px; }
@@ -141,11 +137,9 @@
 
     <div class="side-util left-side">
         <button id="mute-toggle-btn" class="util-circle" onclick="handleMuteToggle()">AUDIO<br>ON</button>
-        <button id="audio-repeat-btn" class="util-circle active-repeat" onclick="replayLastAudioNarration()">REPLAY<br>MSG</button>
     </div>
     <div class="side-util right-side">
         <button id="lock-center-btn" class="util-circle active-center" onclick="handleRecenter()">MAP<br>LOCKED</button>
-        <button id="chat-log-trigger-btn" class="util-circle btn-chat-log" onclick="openChatLogHistoryMenu()">💬<br>CHAT</button>
     </div> 
 
     <div id="screen-overlay" class="modal-overlay" onclick="hideModals()"></div> 
@@ -155,6 +149,8 @@
         <div class="grid-options">
             <button class="btn-caution-menu full-width-btn" onclick="openCautionSelectionFromMenu()">⚠️ CAUTION ENGINE</button>
             <button class="btn-cameras-menu full-width-btn" onclick="openCamerasFromMenu()">🎥 TRAFFIC CAMERAS</button>
+            <button class="btn-replay-menu full-width-btn" onclick="triggerReplayFromMenu()">🔊 REPLAY LAST MSG</button>
+            <button class="btn-logs-menu full-width-btn" onclick="openChatLogHistoryMenuFromMenu()">💬 LIVE ACTIVE LOGS</button>
             <button class="btn-feedback-menu full-width-btn" onclick="openFeedbackFromMenu()">📝 DRIVER FEEDBACK</button>
         </div>
         <button class="btn-close-cam" onclick="hideModals()">Close Menu</button>
@@ -168,14 +164,14 @@
             <button id="tab-btn-police" class="chat-tab-btn" onclick="switchChatLogTab('Police')">Police</button>
         </div>
         <div id="chat-list-target" class="chat-list-container"></div>
-        <button class="btn-close-cam" onclick="hideModals()">Close Logs</button>
+        <button class="btn-close-cam" onclick="backToUtilityMenu('chat-log-pop')">Back</button>
     </div>
 
     <div id="suggestion-pop" class="driver-modal suggestion-grid">
         <span class="modal-title">Driver Suggestion</span>
         <textarea id="driver-suggestion-text" class="suggestion-input" placeholder="Type your request, route issue, or feature idea here..."></textarea>
         <button class="btn-submit-sugg" onclick="submitDriverSuggestion()">Submit Idea</button>
-        <button class="btn-cancel-sugg" onclick="hideModals()">Cancel</button>
+        <button class="btn-cancel-sugg" onclick="backToUtilityMenu('suggestion-pop')">Back</button>
     </div>
 
     <div id="camera-menu-pop" class="driver-modal cam-list-grid">
@@ -310,6 +306,16 @@
         function openCamerasFromMenu() {
             hideModals();
             showModal('camera-menu-pop');
+        }
+
+        function triggerReplayFromMenu() {
+            hideModals();
+            replayLastAudioNarration();
+        }
+
+        function openChatLogHistoryMenuFromMenu() {
+            hideModals();
+            openChatLogHistoryMenu();
         }
 
         function openFeedbackFromMenu() {
