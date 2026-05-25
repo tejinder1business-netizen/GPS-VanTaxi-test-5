@@ -11,14 +11,16 @@
         
         #map { width: 100%; height: 100%; position: absolute; top: 0; bottom: 0; z-index: 1; }
         
-        /* Top HUD Action Buttons Grid (4 Circular Controls) */
-        .top-actions { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 1000; width: 95%; justify-content: center; }
-        .action-btn { width: 82px; height: 82px; border-radius: 50%; border: 4px solid #fff; color: white; font-weight: bold; font-size: 0.82rem; cursor: pointer; box-shadow: 0 6px 12px rgba(0,0,0,0.4); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        /* Top HUD Action Buttons - Repositioned to Corners */
+        .top-actions { position: absolute; top: 20px; left: 0; right: 0; padding: 0 20px; display: flex; justify-content: space-between; z-index: 1000; pointer-events: none; }
+        .action-btn { pointer-events: auto; width: 82px; height: 82px; border-radius: 50%; border: 4px solid #fff; color: white; font-weight: bold; font-size: 0.82rem; cursor: pointer; box-shadow: 0 6px 12px rgba(0,0,0,0.4); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
         .btn-flag { background: #ff3b30; }
-        .btn-caution { background: #ffcc00; color: #000; border-color: #000; }
         .btn-police { background: #007aff; }
-        .btn-camera-top { background: #34c759; } 
         .action-btn span { font-size: 0.62rem; margin-top: 2px; display: block; line-height: 1.1; font-weight: 900; } 
+
+        /* Bottom HUD Menu Trigger Button */
+        .bottom-actions { position: absolute; bottom: 30px; left: 20px; z-index: 1000; }
+        .btn-main-menu { background: #444446; color: white; border-color: #fff; }
 
         /* Middle Side Utility Buttons */
         .side-util { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 20px; }
@@ -30,9 +32,6 @@
         
         /* Repeat Audio Button Style */
         .util-circle.active-repeat { background: #5856d6; color: white; border-color: white; }
-        
-        /* Suggestion Button Style */
-        .util-circle.btn-suggestion { background: #e5e5ea; color: #1c1c1e; border: 3px solid #1c1c1e; }
         
         /* Chat Box Log Toggle Button Style */
         .util-circle.btn-chat-log { background: #f1f1f7; color: #1c1c1e; border: 3px solid #1c1c1e; }
@@ -69,6 +68,12 @@
         
         /* Hotel Button Style Assertion */
         .btn-flag-hotel { grid-column: span 2; background: #5856d6 !important; color: #ffffff !important; border: 3px solid #5856d6; }
+
+        /* Utility Menu Modal Adjustments */
+        .utility-menu-grid { width: 320px; }
+        .btn-caution-menu { background: #ffcc00 !important; color: #000000 !important; border: 3px solid #ffcc00; }
+        .btn-cameras-menu { background: #34c759 !important; color: #ffffff !important; border: 3px solid #34c759; }
+        .btn-feedback-menu { background: #e5e5ea !important; color: #1c1c1e !important; border: 3px solid #1c1c1e; }
 
         /* Caution Menu Styles (Solid Yellow) */
         .caution-grid { width: 310px; }
@@ -127,15 +132,16 @@
 
     <div class="top-actions">
         <button class="action-btn btn-flag" onclick="showModal('flag-pop')">🔴<br><span>FLAG</span></button>
-        <button class="action-btn btn-caution" onclick="showModal('caution-type-pop')">⚠️<br><span>CAUTION</span></button>
         <button class="action-btn btn-police" onclick="showModal('police-pop')">👮<br><span>POLICE</span></button>
-        <button class="action-btn btn-camera-top" onclick="openCameraListMenu()">🎥<br><span>CAMERAS</span></button>
     </div> 
+
+    <div class="bottom-actions">
+        <button class="action-btn btn-main-menu" onclick="showModal('utility-menu-pop')">📋<br><span>MENU</span></button>
+    </div>
 
     <div class="side-util left-side">
         <button id="mute-toggle-btn" class="util-circle" onclick="handleMuteToggle()">AUDIO<br>ON</button>
         <button id="audio-repeat-btn" class="util-circle active-repeat" onclick="replayLastAudioNarration()">REPLAY<br>MSG</button>
-        <button id="suggestion-trigger-btn" class="util-circle btn-suggestion" onclick="showModal('suggestion-pop')">FEED<br>BACK</button>
     </div>
     <div class="side-util right-side">
         <button id="lock-center-btn" class="util-circle active-center" onclick="handleRecenter()">MAP<br>LOCKED</button>
@@ -143,6 +149,16 @@
     </div> 
 
     <div id="screen-overlay" class="modal-overlay" onclick="hideModals()"></div> 
+
+    <div id="utility-menu-pop" class="driver-modal utility-menu-grid">
+        <span class="modal-title">Utility Panel</span>
+        <div class="grid-options">
+            <button class="btn-caution-menu full-width-btn" onclick="openCautionSelectionFromMenu()">⚠️ CAUTION ENGINE</button>
+            <button class="btn-cameras-menu full-width-btn" onclick="openCamerasFromMenu()">🎥 TRAFFIC CAMERAS</button>
+            <button class="btn-feedback-menu full-width-btn" onclick="openFeedbackFromMenu()">📝 DRIVER FEEDBACK</button>
+        </div>
+        <button class="btn-close-cam" onclick="hideModals()">Close Menu</button>
+    </div>
 
     <div id="chat-log-pop" class="driver-modal chat-log-grid">
         <span class="modal-title">Live Active Logs</span>
@@ -177,7 +193,7 @@
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/denman3.htm')">W Georgia and Denman st.</button>
         </div>
         
-        <button class="btn-close-cam" onclick="hideModals()">Close Menu</button>
+        <button class="btn-close-cam" onclick="backToUtilityMenu('camera-menu-pop')">Back</button>
     </div> 
 
     <div id="flag-pop" class="driver-modal flag-grid">
@@ -205,6 +221,7 @@
             <button class="btn-caution-opt full-width-btn" onclick="selectCautionType('Accident')">Accident</button>
             <button class="btn-caution-opt full-width-btn" onclick="selectCautionType('Road closure')">Road Closure</button>
         </div>
+        <button class="btn-close-cam" onclick="backToUtilityMenu('caution-type-pop')" style="margin-top:14px;">Back</button>
     </div> 
 
     <div id="caution-dir-pop" class="driver-modal caution-grid">
@@ -281,6 +298,29 @@
             iconSize: [26, 26],
             iconAnchor: [13, 13]
         }); 
+
+        // =========================================================================================
+        // NEW MENU OVERLAY ROUTING SELECTIONS
+        // =========================================================================================
+        function openCautionSelectionFromMenu() {
+            hideModals();
+            showModal('caution-type-pop');
+        }
+
+        function openCamerasFromMenu() {
+            hideModals();
+            showModal('camera-menu-pop');
+        }
+
+        function openFeedbackFromMenu() {
+            hideModals();
+            showModal('suggestion-pop');
+        }
+
+        function backToUtilityMenu(currentModalId) {
+            document.getElementById(currentModalId).style.display = 'none';
+            showModal('utility-menu-pop');
+        }
 
         // =========================================================================================
         // CAMERA ACTION CONTROLLER (NEW TAB BYPASS MECHANISM)
