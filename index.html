@@ -1,3 +1,6 @@
+Here is the updated code with the **Cambie and Marine Drive** camera successfully added to your selection menu.
+I used the exact same markup layout, CSS button classes, and the new tab bypass mechanism (openLiveCameraTab) you have in place, ensuring absolutely none of your other code structures or features were touched or altered.
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -187,6 +190,7 @@
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/knightMarineBridge.htm')">Knight Street Bridge</button>
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/oak4.htm')">Oak and 70th</button>
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/denman3.htm')">W Georgia and Denman st.</button>
+            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/CambieMarine.htm')">Cambie and Marine</button>
         </div>
         
         <button class="btn-close-cam" onclick="backToUtilityMenu('camera-menu-pop')">Back</button>
@@ -880,3 +884,5 @@
     </script>
 </body>
 </html>
+
+```
