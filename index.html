@@ -186,6 +186,7 @@
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/transcanada01.htm')">HWY 1 and 1st Ave</button>
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/knightMarineBridge.htm')">Knight Street Bridge</button>
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/oak4.htm')">Oak and 70th</button>
+            <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://drivebc.ca/cameras/292?pan=-122.807465%2C49.210133999999954&zoom=12')">Portman Bridge</button>
             <button class="btn-camera-select full-width-btn" onclick="openLiveCameraTab('https://trafficcams.vancouver.ca/denman3.htm')">W Georgia and Denman st.</button>
         </div>
         
@@ -813,70 +814,3 @@
                             <strong style="color:#ff3b30;">HISTORICAL LOGGED FLAG</strong><br>
                             <span>${item.textString}</span><br><br>
                             <a href="${targetNavUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:5px; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
-                        `;
-                    } 
-                    else if (item.category === 'Caution') {
-                        customHistoryIcon = L.divIcon({
-                            className: item.cssClass || 'caution-closure-icon',
-                            html: item.emojiIcon || '🚧',
-                            iconSize: item.size || [34, 34],
-                            iconAnchor: item.anchor || [17, 17]
-                        });
-                        popupContentHtml = `
-                            <strong style="color:#b38f00;">HISTORICAL CAUTION REPORT</strong><br>
-                            <span>${item.textString}</span>
-                        `;
-                    } 
-                    else if (item.category === 'Police') {
-                        customHistoryIcon = L.divIcon({
-                            className: 'police-officer-icon',
-                            html: '👮',
-                            iconSize: [36, 36],
-                            iconAnchor: [18, 18]
-                        });
-                        popupContentHtml = `
-                            <strong style="color:#007aff;">HISTORICAL POLICE LOG</strong><br>
-                            <span>${item.textString}</span>
-                        `;
-                    }
-                    
-                    const temporaryHistoryMarker = L.marker(item.latlng, { icon: customHistoryIcon }).addTo(map);
-                    temporaryHistoryMarker.bindPopup(popupContentHtml).openPopup();
-                    
-                    setTimeout(() => {
-                        map.removeLayer(temporaryHistoryMarker);
-                    }, 30000);
-                };
-                
-                logCard.innerHTML = `
-                    <span class="time-badge">${elapsedMins === 0 ? 'Just Now' : elapsedMins + ' mins ago'}</span>
-                    ${item.textString}
-                `;
-                container.appendChild(logCard);
-            });
-        }
-
-
-        // =========================================================================================
-        // SCREEN ANTI-BLACKOUT WAKELOCK
-        // =========================================================================================
-        async function maintainScreenWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLockToken = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) {
-                console.log("Wake lock framework notice: " + err.message);
-            }
-        } 
-
-        window.addEventListener('load', maintainScreenWakeLock); 
-
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLockToken !== null && document.visibilityState === 'visible') {
-                maintainScreenWakeLock();
-            }
-        });
-    </script>
-</body>
-</html>
