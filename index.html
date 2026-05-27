@@ -59,9 +59,15 @@
         .btn-main-menu { background: #444446; color: white; border-color: #fff; }
 
         /* Middle Side Utility Buttons */
-        .side-util { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 20px; }
-        .left-side { left: 15px; }
-        .right-side { right: 15px; top: 45%; }
+        .side-util { position: absolute; z-index: 1000; display: flex; flex-direction: column; gap: 20px; }
+        .left-side { left: 15px; top: 50%; transform: translateY(-50%); }
+        
+        /* Repositioned Map Lock to precise center right layout */
+        .right-side-center { right: 15px; top: 50%; transform: translateY(-50%); position: absolute; z-index: 1000; }
+        
+        /* Repositioned Yellow Profile Button to extreme bottom right layout */
+        .right-side-bottom { right: 15px; bottom: 30px; position: absolute; z-index: 1000; }
+
         .util-circle { width: 70px; height: 70px; border-radius: 50%; background: #ffffff; border: 3px solid #1c1c1e; color: #1c1c1e; font-weight: 900; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; text-align: center; }
         .util-circle.active-mute { background: #ff453a; color: white; border-color: white; }
         .util-circle.active-center { background: #34c759; color: white; border-color: white; } 
@@ -224,10 +230,14 @@
     <div class="side-util left-side">
         <button id="mute-toggle-btn" class="util-circle" onclick="handleMuteToggle()">AUDIO<br>ON</button>
     </div>
-    <div class="side-util right-side">
+    
+    <div class="right-side-center">
         <button id="lock-center-btn" class="util-circle active-center" onclick="handleRecenter()">MAP<br>LOCKED</button>
-        <button id="profile-hud-trigger-btn" class="util-circle profile-hud-btn" style="margin-top: 15px;" onclick="openFullProfileSettings()">DRV<br>#342</button>
     </div> 
+
+    <div class="right-side-bottom">
+        <button id="profile-hud-trigger-btn" class="util-circle profile-hud-btn" onclick="openFullProfileSettings()">DRV<br>#342</button>
+    </div>
 
     <div id="screen-overlay" class="modal-overlay" onclick="hideModals()"></div> 
 
@@ -236,7 +246,13 @@
         
         <div id="profile-setup-fields-wrapper">
             <label class="profile-field-label">1. What company do you drive for?</label>
-            <input type="text" id="driver-company-input" class="profile-input-field" placeholder="e.g. Yellow Cab Company Private Limited">
+            <select id="driver-company-select" class="profile-select-field" style="background:#fff;" onchange="handleCompanySelectionFramework(this)">
+                <option value="Yellow Cab Company Private Limited">Yellow Cab Company Private Limited</option>
+                <option value="Black Top Cabs">Black Top Cabs</option>
+                <option value="Maclure's Cabs">Maclure's Cabs</option>
+                <option value="Vancouver Taxi">Vancouver Taxi</option>
+                <option value="__ADD_NEW_COMPANY__">[ + Add Custom Fleet Company ]</option>
+            </select>
             
             <label class="profile-field-label">2. What is your car number?</label>
             <input type="text" id="driver-car-input" class="profile-input-field" placeholder="e.g. 342">
@@ -303,7 +319,8 @@
         </div>
         <div class="match-input-row">
             <label>Target Fleet Company:</label>
-            <input type="text" id="match-company-target-input" class="profile-input-field" style="margin:0; width:55%; padding:6px; font-size:0.85rem;" placeholder="e.g. Yellow Cab">
+            <select id="match-company-target-select" class="profile-select-field" style="margin:0; width:55%; padding:6px; font-size:0.85rem; background:#fff;" onchange="renderMatchingBoardEntries()">
+                </select>
         </div>
         <button class="btn-log-availability" onclick="submitAvailabilityToMatchPool()">Publish Availability</button>
         
@@ -454,6 +471,14 @@
         let preferredZoomDepth = 17; 
         let zoomVisibilityTimeout = null;
 
+        // GLOBAL ALL-TIME PERSISTENT COMPANY DIRECTORY CACHE
+        let activeCompanyRegistry = [
+            "Yellow Cab Company Private Limited",
+            "Black Top Cabs",
+            "Maclure's Cabs",
+            "Vancouver Taxi"
+        ];
+
         // PROFILE REGISTRATION AND ACTIVE IDENTITY MEMORY
         let driverProfileMemory = {
             uid: "",
@@ -531,6 +556,52 @@
             });
         }
 
+        // POPULATES BOTH DROPDOWN INTERFACE SCHEMES SYNCHRONOUSLY
+        function syncCompanyDropdownUIFields() {
+            const profileSelect = document.getElementById('driver-company-select');
+            const matchSelect = document.getElementById('match-company-target-select');
+            
+            // Rebuild main settings menu selector items
+            let profileOptionsHtml = "";
+            activeCompanyRegistry.forEach(comp => {
+                profileOptionsHtml += `<option value="${comp}">${comp}</option>`;
+            });
+            profileOptionsHtml += `<option value="__ADD_NEW_COMPANY__">[ + Add Custom Fleet Company ]</option>`;
+            profileSelect.innerHTML = profileOptionsHtml;
+            
+            // Rebuild driver match filter selector items
+            let matchOptionsHtml = "";
+            activeCompanyRegistry.forEach(comp => {
+                matchOptionsHtml += `<option value="${comp}">${comp}</option>`;
+            });
+            matchSelect.innerHTML = matchOptionsHtml;
+        }
+
+        // HANDLES AD-HOC INTERACTIVE REGISTRATION PROCEDURES FOR NEW TAXI ENTITIES
+        function handleCompanySelectionFramework(selectElement) {
+            if (selectElement.value === "__ADD_NEW_COMPANY__") {
+                const customFirmName = prompt("ENTER FORMAL REGISTERED NAME FOR YOUR NEW TAXI COMPANY:");
+                
+                if (customFirmName && customFirmName.trim() !== "") {
+                    const cleanedName = customFirmName.trim();
+                    
+                    // Add to system registry array cache if it is unique
+                    if (!activeCompanyRegistry.includes(cleanedName)) {
+                        activeCompanyRegistry.push(cleanedName);
+                    }
+                    
+                    // Update and refresh options across all views
+                    syncCompanyDropdownUIFields();
+                    
+                    // Force selected value to match the newly added firm asset entry
+                    selectElement.value = cleanedName;
+                } else {
+                    // Fall back to first option item if registration cancels out
+                    selectElement.value = activeCompanyRegistry[0];
+                }
+            }
+        }
+
         // Set default time values for input on page load
         window.addEventListener('DOMContentLoaded', () => {
             const now = new Date();
@@ -538,15 +609,18 @@
             const defaultTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
             document.getElementById('shift-end-time-input').value = defaultTimeStr;
             
+            // Initialize dropdown elements array data schemas
+            syncCompanyDropdownUIFields();
+            
             // Prefill with traditional structured user preferences 
-            document.getElementById('driver-company-input').value = driverProfileMemory.company;
+            document.getElementById('driver-company-select').value = driverProfileMemory.company;
             document.getElementById('driver-car-input').value = driverProfileMemory.carNumber;
             document.getElementById('driver-name-input').value = driverProfileMemory.displayName;
             document.getElementById('driver-role-select').value = driverProfileMemory.role;
             document.getElementById('driver-phone-input').value = driverProfileMemory.phoneNumber;
             
-            // Prefill the Match Target Company input box with current profile company
-            document.getElementById('match-company-target-input').value = driverProfileMemory.company;
+            // Prefill the Match Target Company select menu with current profile company value
+            document.getElementById('match-company-target-select').value = driverProfileMemory.company;
             
             // Set Default value for the Match calendar tool to today
             document.getElementById('match-calendar-date').value = new Date().toISOString().split('T')[0];
@@ -601,8 +675,11 @@
             // Set dynamic header titles and show full input areas
             document.getElementById('profile-modal-main-title').innerText = "Edit Profile Settings";
             
+            // Refresh drop choices arrays 
+            syncCompanyDropdownUIFields();
+            
             // Pre-populate input values with existing active cache data values
-            document.getElementById('driver-company-input').value = driverProfileMemory.company;
+            document.getElementById('driver-company-select').value = driverProfileMemory.company;
             document.getElementById('driver-car-input').value = driverProfileMemory.carNumber;
             document.getElementById('driver-name-input').value = driverProfileMemory.displayName;
             document.getElementById('driver-role-select').value = driverProfileMemory.role;
@@ -632,13 +709,13 @@
 
         // Save modifications from a mid-shift profile adjustment action
         function saveProfileAdjustmentsDirectly() {
-            const companyVal = document.getElementById('driver-company-input').value.trim();
+            const companyVal = document.getElementById('driver-company-select').value.trim();
             const carVal = document.getElementById('driver-car-input').value.trim();
             const nameVal = document.getElementById('driver-name-input').value.trim();
             const roleVal = document.getElementById('driver-role-select').value;
             const phoneVal = document.getElementById('driver-phone-input').value.trim();
             
-            if (!companyVal || !carVal || !nameVal) {
+            if (!companyVal || companyVal === "__ADD_NEW_COMPANY__" || !carVal || !nameVal) {
                 alert("ALL PROFILE INFORMATION FIELDS ARE MANDATORY TO SECURE DRIVER ANCHOR IDENTITY.");
                 return;
             }
@@ -651,7 +728,7 @@
             driverProfileMemory.phoneNumber = phoneVal;
             
             // Keep matching dashboard sync targets accurate
-            document.getElementById('match-company-target-input').value = companyVal;
+            document.getElementById('match-company-target-select').value = companyVal;
             
             isProfileDataAnchored = true;
             updateHudProfileTriggerButtonLabel();
@@ -705,13 +782,13 @@
         function initializeDriverShiftTimer() {
             // Read fields only if they are visible/active
             if (!isProfileDataAnchored) {
-                const companyVal = document.getElementById('driver-company-input').value.trim();
+                const companyVal = document.getElementById('driver-company-select').value.trim();
                 const carVal = document.getElementById('driver-car-input').value.trim();
                 const nameVal = document.getElementById('driver-name-input').value.trim();
                 const roleVal = document.getElementById('driver-role-select').value;
                 const phoneVal = document.getElementById('driver-phone-input').value.trim();
                 
-                if (!companyVal || !carVal || !nameVal) {
+                if (!companyVal || companyVal === "__ADD_NEW_COMPANY__" || !carVal || !nameVal) {
                     alert("ALL PROFILE INFORMATION FIELDS ARE MANDATORY TO SECURE DRIVER ANCHOR IDENTITY.");
                     return;
                 }
@@ -724,7 +801,7 @@
                 driverProfileMemory.phoneNumber = phoneVal;
                 
                 // Update Matching panel prefill value dynamically
-                document.getElementById('match-company-target-input').value = companyVal;
+                document.getElementById('match-company-target-select').value = companyVal;
                 
                 isProfileDataAnchored = true;
             }
@@ -843,6 +920,10 @@
             document.getElementById('match-ui-current-role').innerText = driverProfileMemory.role.toUpperCase();
             document.getElementById('match-ui-current-phone').innerText = driverProfileMemory.phoneNumber || "None Added (Update Profile Setup)";
             
+            // Regenerate menu select parameters list 
+            syncCompanyDropdownUIFields();
+            document.getElementById('match-company-target-select').value = driverProfileMemory.company;
+            
             renderMatchingBoardEntries();
             showModal('driver-matching-pop');
         }
@@ -858,13 +939,13 @@
 
             const chosenDate = document.getElementById('match-calendar-date').value;
             const chosenShift = document.getElementById('match-calendar-shift').value;
-            const chosenCompany = document.getElementById('match-company-target-input').value.trim();
+            const chosenCompany = document.getElementById('match-company-target-select').value;
 
             if (!chosenDate) {
                 alert("PLEASE HIGHLIGHT A VALID TARGET DATE ON THE CALENDAR SYSTEM.");
                 return;
             }
-            if (!chosenCompany) {
+            if (!chosenCompany || chosenCompany === "__ADD_NEW_COMPANY__") {
                 alert("PLEASE DECLARE A TARGET FLEET COMPANY FOR COOPERATIVE MATCH FILTERING.");
                 return;
             }
@@ -898,8 +979,9 @@
             const targetDate = document.getElementById('match-calendar-date').value;
             const targetShift = document.getElementById('match-calendar-shift').value;
             
-            // Normalize company string to ensure safe matching
-            const myProfileCompanyNorm = driverProfileMemory.company.toLowerCase().trim();
+            // Normalize selected filter menu item value cleanly
+            const chosenCompanyVal = document.getElementById('match-company-target-select').value;
+            const targetCompanyNorm = chosenCompanyVal ? chosenCompanyVal.toLowerCase().trim() : "";
             const myRole = driverProfileMemory.role; // "Driver" or "Owner"
 
             let driverCount = 0;
@@ -911,23 +993,9 @@
 
                 const itemCompanyNorm = item.company.toLowerCase().trim();
                 
-                // CORE BILATERAL COMPANY WHITE-LIST FILTER RULES:
-                // 1. If current user is a Driver: They should only see Owners/Cars belonging to their exact company.
-                // 2. If current user is an Owner: They should only see Drivers wanting to operate under their exact company.
-                // 3. Profiles matching your own exact role types are rendered generally without cross-filtering blocks.
-                let isPassedByBilateralFilter = true;
-                
-                if (myRole === "Driver" && item.role === "Owner") {
-                    if (!itemCompanyNorm.includes(myProfileCompanyNorm) && !myProfileCompanyNorm.includes(itemCompanyNorm)) {
-                        isPassedByBilateralFilter = false;
-                    }
-                } else if (myRole === "Owner" && item.role === "Driver") {
-                    if (!itemCompanyNorm.includes(myProfileCompanyNorm) && !myProfileCompanyNorm.includes(itemCompanyNorm)) {
-                        isPassedByBilateralFilter = false;
-                    }
-                }
-
-                if (!isPassedByBilateralFilter) return;
+                // BILATERAL DROPDOWN EXCHANGE FILTER RULE ENGINE:
+                // Match items against target filter option selection currently specified by user.
+                if (itemCompanyNorm !== targetCompanyNorm) return;
 
                 // Build Row
                 const row = document.createElement('div');
