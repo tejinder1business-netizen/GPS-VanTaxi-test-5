@@ -61,10 +61,11 @@
         /* Middle Side Utility Buttons */
         .side-util { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 20px; }
         .left-side { left: 15px; }
-        .right-side { right: 15px; }
+        .right-side { right: 15px; top: 45%; }
         .util-circle { width: 70px; height: 70px; border-radius: 50%; background: #ffffff; border: 3px solid #1c1c1e; color: #1c1c1e; font-weight: 900; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; text-align: center; }
         .util-circle.active-mute { background: #ff453a; color: white; border-color: white; }
         .util-circle.active-center { background: #34c759; color: white; border-color: white; } 
+        .util-circle.profile-hud-btn { background: #ffd100; color: #1c1c1e; border-color: #1c1c1e; }
 
         /* Custom Pure CSS Taxi Moving Element */
         .taxi-vector-icon { background: #ffd100; border: 2px solid #000; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); text-align: center; font-weight: bold; font-size: 9px; line-height: 24px; color: black; font-family: monospace; padding: 0 2px; white-space: nowrap; }
@@ -225,12 +226,13 @@
     </div>
     <div class="side-util right-side">
         <button id="lock-center-btn" class="util-circle active-center" onclick="handleRecenter()">MAP<br>LOCKED</button>
+        <button id="profile-hud-trigger-btn" class="util-circle profile-hud-btn" style="margin-top: 15px;" onclick="openFullProfileSettings()">DRV<br>#342</button>
     </div> 
 
     <div id="screen-overlay" class="modal-overlay" onclick="hideModals()"></div> 
 
     <div id="shift-scheduler-pop" class="driver-modal shift-modal-grid" style="display: block;">
-        <span class="modal-title">Driver Profile Setup</span>
+        <span class="modal-title" id="profile-modal-main-title">Driver Profile Setup</span>
         
         <div id="profile-setup-fields-wrapper">
             <label class="profile-field-label">1. What company do you drive for?</label>
@@ -255,12 +257,16 @@
         <div id="profile-saved-identity-hud" style="display:none; background:#f2f2f7; padding:10px; border-radius:8px; border:2px dashed #8e8e93; margin-bottom:12px; font-size:0.88rem; font-weight:700; color:#1c1c1e; text-align:center;">
             Active Identity Confirmed: <span id="hud-saved-name" style="color:#007aff;">---</span><br>
             <span id="hud-saved-fleet" style="font-size:0.75rem; color:#636366;">---</span>
+            <button class="btn-close-cam" style="margin-top: 8px; padding: 6px; font-size: 0.8rem;" onclick="forceExpandProfileEditor()">Modify Profile Details</button>
         </div>
 
-        <label class="profile-field-label" style="margin-top: 6px; color: #48484a; text-align: center;">What time does your shift end?</label>
-        <input type="time" id="shift-end-time-input" class="shift-time-picker">
+        <div id="shift-end-time-picker-section">
+            <label class="profile-field-label" style="margin-top: 6px; color: #48484a; text-align: center;">What time does your shift end?</label>
+            <input type="time" id="shift-end-time-input" class="shift-time-picker">
+        </div>
         
-        <button class="btn-confirm-shift" onclick="initializeDriverShiftTimer()">Go On Duty</button>
+        <button id="profile-submit-action-btn" class="btn-confirm-shift" onclick="initializeDriverShiftTimer()">Go On Duty</button>
+        <button id="profile-close-action-btn" class="btn-close-cam" style="display: none; margin-top: 10px;" onclick="hideModals()">Close Settings</button>
     </div>
 
     <div id="utility-menu-pop" class="driver-modal utility-menu-grid">
@@ -408,9 +414,9 @@
     <div id="police-pop" class="driver-modal police-grid">
         <span class="modal-title">Police Threat Zone</span>
         <div class="grid-options">
-            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('radar')">Radar</option>
-            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('emergency')">Emergency</option>
-            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('hidden')">Hidden</option>
+            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('radar')">Radar</button>
+            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('emergency')">Emergency</button>
+            <button class="btn-police-opt full-width-btn" onclick="selectPoliceType('hidden')">Hidden</button>
         </div>
     </div> 
 
@@ -554,9 +560,23 @@
                 toggleProfileModalFieldsDisplay(false);
             }
             
+            updateHudProfileTriggerButtonLabel();
+            
             document.getElementById('screen-overlay').style.display = 'block';
             document.getElementById('shift-scheduler-pop').style.display = 'block';
         });
+
+        // Helper function to update the map side button label
+        function updateHudProfileTriggerButtonLabel() {
+            const btn = document.getElementById('profile-hud-trigger-btn');
+            if (btn) {
+                if (driverProfileMemory.carNumber) {
+                    btn.innerHTML = `CAR<br>#${driverProfileMemory.carNumber}`;
+                } else {
+                    btn.innerHTML = `PROF<br>EDIT`;
+                }
+            }
+        }
 
         // Helper function to hide profile input layers if identity data is already cached
         function toggleProfileModalFieldsDisplay(isAnchored) {
@@ -572,6 +592,78 @@
                 fieldsWrapper.style.display = 'block';
                 identityHud.style.display = 'none';
             }
+        }
+
+        // Trigger function to handle clicking the Profile Button on the side of the map screen
+        function openFullProfileSettings() {
+            if (driverProfileMemory.isSuspended) return;
+            
+            // Set dynamic header titles and show full input areas
+            document.getElementById('profile-modal-main-title').innerText = "Edit Profile Settings";
+            
+            // Pre-populate input values with existing active cache data values
+            document.getElementById('driver-company-input').value = driverProfileMemory.company;
+            document.getElementById('driver-car-input').value = driverProfileMemory.carNumber;
+            document.getElementById('driver-name-input').value = driverProfileMemory.displayName;
+            document.getElementById('driver-role-select').value = driverProfileMemory.role;
+            document.getElementById('driver-phone-input').value = driverProfileMemory.phoneNumber;
+            
+            // Show the inputs directly for editing access
+            document.getElementById('profile-setup-fields-wrapper').style.display = 'block';
+            document.getElementById('profile-saved-identity-hud').style.display = 'none';
+            
+            // Hide shift timer field so they focus purely on updating personal records
+            document.getElementById('shift-end-time-picker-section').style.display = 'none';
+            
+            // Transform button modes to save corrections cleanly
+            const submitBtn = document.getElementById('profile-submit-action-btn');
+            submitBtn.innerText = "Save Adjustments";
+            submitBtn.setAttribute('onclick', 'saveProfileAdjustmentsDirectly()');
+            
+            document.getElementById('profile-close-action-btn').style.display = 'block';
+            
+            showModal('shift-scheduler-pop');
+        }
+
+        function forceExpandProfileEditor() {
+            document.getElementById('profile-setup-fields-wrapper').style.display = 'block';
+            document.getElementById('profile-saved-identity-hud').style.display = 'none';
+        }
+
+        // Save modifications from a mid-shift profile adjustment action
+        function saveProfileAdjustmentsDirectly() {
+            const companyVal = document.getElementById('driver-company-input').value.trim();
+            const carVal = document.getElementById('driver-car-input').value.trim();
+            const nameVal = document.getElementById('driver-name-input').value.trim();
+            const roleVal = document.getElementById('driver-role-select').value;
+            const phoneVal = document.getElementById('driver-phone-input').value.trim();
+            
+            if (!companyVal || !carVal || !nameVal) {
+                alert("ALL PROFILE INFORMATION FIELDS ARE MANDATORY TO SECURE DRIVER ANCHOR IDENTITY.");
+                return;
+            }
+
+            // Write properties directly to memory storage cache
+            driverProfileMemory.company = companyVal;
+            driverProfileMemory.carNumber = carVal;
+            driverProfileMemory.displayName = nameVal;
+            driverProfileMemory.role = roleVal;
+            driverProfileMemory.phoneNumber = phoneVal;
+            
+            // Keep matching dashboard sync targets accurate
+            document.getElementById('match-company-target-input').value = companyVal;
+            
+            isProfileDataAnchored = true;
+            updateHudProfileTriggerButtonLabel();
+
+            // Refresh marker visuals dynamically
+            if (vehicleMarker && vehiclePos) {
+                map.removeLayer(vehicleMarker);
+                vehicleMarker = L.marker(vehiclePos, { icon: generateDynamicTaxiIcon() }).addTo(map);
+            }
+
+            hideModals();
+            alert("SUCCESS: Your profile registry identity configurations have been live adjusted!");
         }
 
         // =========================================================================================
@@ -663,6 +755,8 @@
             if (shiftMonitoringInterval) clearInterval(shiftMonitoringInterval);
             shiftMonitoringInterval = setInterval(checkShiftTimeExpirationStatus, 1000);
 
+            updateHudProfileTriggerButtonLabel();
+
             // Re-render vehicle marker with dynamic contextual layout configuration updates
             if (vehicleMarker && vehiclePos) {
                 map.removeLayer(vehicleMarker);
@@ -722,6 +816,16 @@
                 btn.innerHTML = "AUDIO<br>ON";
             }
             
+            // Re-enable scheduling view configurations setup parameters
+            document.getElementById('profile-modal-main-title').innerText = "Driver Profile Setup";
+            document.getElementById('shift-end-time-picker-section').style.display = 'block';
+            
+            const submitBtn = document.getElementById('profile-submit-action-btn');
+            submitBtn.innerText = "Go On Duty";
+            submitBtn.setAttribute('onclick', 'initializeDriverShiftTimer()');
+            
+            document.getElementById('profile-close-action-btn').style.display = 'none';
+            
             // Force dynamic assessment of profile cache state on manual restart
             toggleProfileModalFieldsDisplay(isProfileDataAnchored);
             
@@ -748,9 +852,7 @@
             if (!driverProfileMemory.phoneNumber) {
                 alert("PHONE NUMBER IS REQUIRED IN YOUR DRIVER PROFILE SYSTEM BEFORE LOGGING CALENDAR AVAILABILITY TO SECURE BILATERAL COMMUNICATIONS.");
                 hideModals();
-                toggleProfileModalFieldsDisplay(false); // Force opening fields to let them enter phone
-                isProfileDataAnchored = false; // Reset anchor flag to allow input corrections
-                showModal('shift-scheduler-pop');
+                openFullProfileSettings();
                 return;
             }
 
@@ -783,7 +885,7 @@
             mockSharedMatchingPool.push(newCalendarItem);
             renderMatchingBoardEntries();
             
-            alert(`SUCCESS: Your ${chosenShift} availability under "${chosenCompany}" for ${chosenDate} has been locked onto the shared marketplace boards!`);
+            alert(`SUCCESS: Your ${chosenShift} availability under "${chosenCompany}" for ${chosenDate} has been logged onto the shared marketplace boards!`);
         }
 
         function renderMatchingBoardEntries() {
