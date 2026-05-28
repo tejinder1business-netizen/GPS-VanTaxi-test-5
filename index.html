@@ -530,6 +530,51 @@
         let shiftMonitoringInterval = null;
         let isShiftActive = false;
 
+        // =========================================================================================
+        // WEBSOCKET NETWORKING PIPELINE
+        // =========================================================================================
+        let wsNetwork = null;
+        const generatedClientId = "NET-DRV-" + Math.floor(100000 + Math.random() * 900000);
+
+        function initializeWebSocketSyncPipeline() {
+            // Using a standard public secure echo cluster framework.
+            // On standard echo platforms, messages bounce right back to all subscribers.
+            wsNetwork = new WebSocket("wss://echo.websocket.events");
+
+            wsNetwork.onopen = () => {
+                console.log("Network Coordination Engine online. Sync active via: " + generatedClientId);
+            };
+
+            wsNetwork.onmessage = (event) => {
+                try {
+                    let networkPayload = JSON.parse(event.data);
+                    
+                    // Discard our own mirrored data to prevent double placement
+                    if (networkPayload.senderId === generatedClientId) return;
+
+                    // Forward incoming data to the remote layout generation processor
+                    executeRemoteMarkerDeployment(networkPayload);
+                } catch (err) {
+                    // Fail silently for non-JSON verification pings
+                }
+            };
+
+            wsNetwork.onclose = () => {
+                console.log("Network dropped. Attempting automated reconnection pipeline...");
+                setTimeout(initializeWebSocketSyncPipeline, 5000);
+            };
+        }
+
+        function broadcastMarkerPayload(payloadData) {
+            if (wsNetwork && wsNetwork.readyState === WebSocket.OPEN) {
+                payloadData.senderId = generatedClientId;
+                wsNetwork.send(JSON.stringify(payloadData));
+            }
+        }
+
+        // Initialize connection automatically
+        initializeWebSocketSyncPipeline();
+
         // Dynamic Moving Taxi Label Construction Logic
         function generateDynamicTaxiIcon() {
             let markerLabel = "TAXI";
@@ -1224,6 +1269,129 @@
         } 
 
         // =========================================================================================
+        // REMOTE NETWORK MARKER DEPLOYMENT PROCESSOR
+        // =========================================================================================
+        function executeRemoteMarkerDeployment(data) {
+            const targetPos = L.latLng(data.latlng.lat, data.latlng.lng);
+            
+            if (data.category === 'Flag') {
+                const redManIcon = L.divIcon({
+                    className: 'red-man-icon',
+                    html: data.selectionValue === 'Hotel Driveway' ? '🏨' : '🚶',
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 32]
+                });
+
+                const flagMarker = L.marker(targetPos, { icon: redManIcon }).addTo(map);
+                
+                let headerLabel = `<strong style="color:#ff3b30;">FLAG WAITING</strong>`;
+                if (data.selectionValue === 'Hotel Driveway') {
+                    headerLabel = `<strong style="color:#5856d6;">HOTEL DISPATCH FLAG</strong>`;
+                }
+
+                activeMarkersLog.push({
+                    category: 'Flag',
+                    timestamp: data.timestamp,
+                    latlng: targetPos,
+                    textString: data.textString,
+                    emojiIcon: data.selectionValue === 'Hotel Driveway' ? '🏨' : '🚶',
+                    subType: data.selectionValue
+                });
+
+                const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${targetPos.lat},${targetPos.lng}`;
+                flagMarker.bindPopup(`
+                    ${headerLabel}<br>
+                    <strong>Placement:</strong> ${data.selectionValue}<br>
+                    <span>Location: ${data.completeAddress}</span><br><br>
+                    <a href="${navigationUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:5px; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
+                `);
+
+                // Trigger network voice audio sequence dynamically
+                executeRemoteAudioNarration(data.textString);
+
+                setTimeout(() => { map.removeLayer(flagMarker); }, 300000);
+            }
+            else if (data.category === 'Caution') {
+                const cautionDivIcon = L.divIcon({
+                    className: data.classLabel,
+                    html: data.cautionIconHtml,
+                    iconSize: data.customSize,
+                    iconAnchor: data.anchorOffsets
+                });
+
+                const dynamicMarker = L.marker(targetPos, { icon: cautionDivIcon }).addTo(map);
+
+                activeMarkersLog.push({
+                    category: 'Caution',
+                    timestamp: data.timestamp,
+                    latlng: targetPos,
+                    textString: data.textString,
+                    emojiIcon: data.cautionIconHtml,
+                    cssClass: data.classLabel,
+                    size: data.customSize,
+                    anchor: data.anchorOffsets,
+                    subType: data.typeLabel,
+                    dir: data.directionLabel
+                });
+
+                dynamicMarker.bindPopup(`
+                    <strong style="color:#b38f00;">${data.typeLabel.toUpperCase()}</strong><br>
+                    <strong>Direction:</strong> ${data.directionLabel}<br>
+                    <span>Location: ${data.completeAddress}</span>
+                `);
+
+                executeRemoteAudioNarration(data.textString);
+
+                setTimeout(() => { map.removeLayer(dynamicMarker); }, 1200000);
+            }
+            else if (data.category === 'Police') {
+                const policeIcon = L.divIcon({
+                    className: 'police-officer-icon',
+                    html: '👮',
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+
+                const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
+
+                activeMarkersLog.push({
+                    category: 'Police',
+                    timestamp: data.timestamp,
+                    latlng: targetPos,
+                    textString: data.textString,
+                    emojiIcon: '👮',
+                    subType: data.typeLabel,
+                    dir: data.directionLabel
+                });
+
+                officerMarker.bindPopup(`
+                    <strong style="color:#007aff;">POLICE ENFORCEMENT</strong><br>
+                    <strong>Type:</strong> ${data.typeLabel.toUpperCase()} (${data.directionLabel})<br>
+                    <span>Location: ${data.completeAddress}</span>
+                `);
+
+                executeRemoteAudioNarration(data.textString);
+
+                setTimeout(() => { map.removeLayer(officerMarker); }, 1800000);
+            }
+        }
+
+        function executeRemoteAudioNarration(speechString) {
+            if (!isShiftActive || audioMuted || driverProfileMemory.isSuspended) return;
+            lastSpokenSpeechString = speechString;
+            
+            const clearHardwareBuffer = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(clearHardwareBuffer); 
+
+            setTimeout(() => {
+                if (driverProfileMemory.isSuspended) return;
+                const utterance = new SpeechSynthesisUtterance(speechString);
+                utterance.rate = 1.0; 
+                window.speechSynthesis.speak(utterance);
+            }, 1500);
+        }
+
+        // =========================================================================================
         // DISPATCH PASSENGER FLAG MARKER
         // =========================================================================================
         function dropFlagDirect(selectionValue) {
@@ -1269,6 +1437,16 @@
                 `).openPopup(); 
 
                 dispatchAudioNarration('Flag', selectionValue); 
+
+                // Broadcast out to other peer units
+                broadcastMarkerPayload({
+                    category: 'Flag',
+                    timestamp: Date.now(),
+                    latlng: { lat: targetPos.lat, lng: targetPos.lng },
+                    selectionValue: selectionValue,
+                    completeAddress: completeAddress,
+                    textString: displayString
+                });
 
                 setTimeout(() => {
                     map.removeLayer(flagMarker);
@@ -1332,12 +1510,13 @@
 
                 const dynamicMarker = L.marker(targetPos, { icon: cautionDivIcon }).addTo(map); 
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
+                let displayString = `Caution Conditions: ${typeLabel} ahead (${directionLabel}) at ${completeAddress}`;
 
                 activeMarkersLog.push({
                     category: 'Caution',
                     timestamp: Date.now(),
                     latlng: targetPos,
-                    textString: `Caution Conditions: ${typeLabel} ahead (${directionLabel}) at ${completeAddress}`,
+                    textString: displayString,
                     emojiIcon: cautionIconHtml,
                     cssClass: classLabel,
                     size: customSize,
@@ -1347,12 +1526,27 @@
                 });
 
                 dynamicMarker.bindPopup(`
+                    <img src="" onerror="this.style.display='none'">
                     <strong style="color:#b38f00;">${typeLabel.toUpperCase()}</strong><br>
                     <strong>Direction:</strong> ${directionLabel}<br>
                     <span>Location: ${completeAddress}</span>
                 `).openPopup(); 
 
                 dispatchAudioNarration('Caution', { type: typeLabel, direction: directionLabel });
+
+                broadcastMarkerPayload({
+                    category: 'Caution',
+                    timestamp: Date.now(),
+                    latlng: { lat: targetPos.lat, lng: targetPos.lng },
+                    typeLabel: typeLabel,
+                    directionLabel: directionLabel,
+                    completeAddress: completeAddress,
+                    cautionIconHtml: cautionIconHtml,
+                    classLabel: classLabel,
+                    customSize: customSize,
+                    anchorOffsets: anchorOffsets,
+                    textString: displayString
+                });
 
                 setTimeout(() => {
                     map.removeLayer(dynamicMarker);
@@ -1389,12 +1583,13 @@
 
                 const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
                 const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
+                let displayString = `Police reported ahead ${directionLabel.toLowerCase()} at ${completeAddress} - Type: ${typeLabel.toUpperCase()}`;
 
                 activeMarkersLog.push({
                     category: 'Police',
                     timestamp: Date.now(),
                     latlng: targetPos,
-                    textString: `Police reported ahead ${directionLabel.toLowerCase()} at ${completeAddress} - Type: ${typeLabel.toUpperCase()}`,
+                    textString: displayString,
                     emojiIcon: '👮',
                     subType: typeLabel,
                     dir: directionLabel
@@ -1407,6 +1602,16 @@
                 `).openPopup(); 
 
                 dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
+
+                broadcastMarkerPayload({
+                    category: 'Police',
+                    timestamp: Date.now(),
+                    latlng: { lat: targetPos.lat, lng: targetPos.lng },
+                    typeLabel: typeLabel,
+                    directionLabel: directionLabel,
+                    completeAddress: completeAddress,
+                    textString: displayString
+                });
 
                 setTimeout(() => {
                     map.removeLayer(officerMarker);
@@ -1633,7 +1838,7 @@
             });
         }
 
-        // Screen Wake Lock Handler
+        /* Screen Wake Lock Handler */
         async function maintainScreenWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
