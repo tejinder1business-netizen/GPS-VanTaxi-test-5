@@ -471,6 +471,9 @@
         let preferredZoomDepth = 17; 
         let zoomVisibilityTimeout = null;
 
+        // GLOBAL WEBSOCKET CONNECTION INSTANCE TRACKER
+        let globalSocketInstance = null;
+
         // GLOBAL ALL-TIME PERSISTENT COMPANY DIRECTORY CACHE
         let activeCompanyRegistry = [
             "Yellow Cab Company Private Limited",
@@ -529,50 +532,6 @@
         let targetShiftEndTimestamp = null;
         let shiftMonitoringInterval = null;
         let isShiftActive = false;
-
-        // =========================================================================================
-        // WEBSOCKET NETWORKING PIPELINE
-        // =========================================================================================
-        let wsNetwork = null;
-        const generatedClientId = "NET-DRV-" + Math.floor(100000 + Math.random() * 900000);
-
-        function initializeWebSocketSyncPipeline() {
-            // Updated to use the PieSocket public broadcast channel for cross-device synchronization
-            wsNetwork = new WebSocket("wss://demo.piesocket.com/v3/yellow_cab_fleet_room?api_key=VCXCEuvK86mN3YVvXg9scU9GgH6vAc636rw0q3pG&notify_self=0");
-
-            wsNetwork.onopen = () => {
-                console.log("Network Coordination Engine online. Sync active via: " + generatedClientId);
-            };
-
-            wsNetwork.onmessage = (event) => {
-                try {
-                    let networkPayload = JSON.parse(event.data);
-                    
-                    // Discard our own mirrored data to prevent double placement
-                    if (networkPayload.senderId === generatedClientId) return;
-
-                    // Forward incoming data to the remote layout generation processor
-                    executeRemoteMarkerDeployment(networkPayload);
-                } catch (err) {
-                    // Fail silently for non-JSON verification pings
-                }
-            };
-
-            wsNetwork.onclose = () => {
-                console.log("Network dropped. Attempting automated reconnection pipeline...");
-                setTimeout(initializeWebSocketSyncPipeline, 5000);
-            };
-        }
-
-        function broadcastMarkerPayload(payloadData) {
-            if (wsNetwork && wsNetwork.readyState === WebSocket.OPEN) {
-                payloadData.senderId = generatedClientId;
-                wsNetwork.send(JSON.stringify(payloadData));
-            }
-        }
-
-        // Initialize connection automatically
-        initializeWebSocketSyncPipeline();
 
         // Dynamic Moving Taxi Label Construction Logic
         function generateDynamicTaxiIcon() {
@@ -697,4 +656,1221 @@
         }
 
         // Helper function to hide profile input layers if identity data is already cached
-        function toggleProfileModalFieldsDisplay(isAnchored
+        function toggleProfileModalFieldsDisplay(isAnchored) {
+            const fieldsWrapper = document.getElementById('profile-setup-fields-wrapper');
+            const identityHud = document.getElementById('profile-saved-identity-hud');
+            
+            if (isAnchored) {
+                fieldsWrapper.style.display = 'none';
+                identityHud.style.display = 'block';
+                document.getElementById('hud-saved-name').innerText = `${driverProfileMemory.displayName} (${driverProfileMemory.role.toUpperCase()})`;
+                document.getElementById('hud-saved-fleet').innerText = `${driverProfileMemory.company} - Car #${driverProfileMemory.carNumber}`;
+            } else {
+                fieldsWrapper.style.display = 'block';
+                identityHud.style.display = 'none';
+            }
+        }
+
+        // Trigger function to handle clicking the Profile Button on the side of the map screen
+        function openFullProfileSettings() {
+            if (driverProfileMemory.isSuspended) return;
+            
+            // Set dynamic header titles and show full input areas
+            document.getElementById('profile-modal-main-title').innerText = "Edit Profile Settings";
+            
+            // Refresh drop choices arrays 
+            syncCompanyDropdownUIFields();
+            
+            // Pre-populate input values with existing active cache data values
+            document.getElementById('driver-company-select').value = driverProfileMemory.company;
+            document.getElementById('driver-car-input').value = driverProfileMemory.carNumber;
+            document.getElementById('driver-name-input').value = driverProfileMemory.displayName;
+            document.getElementById('driver-role-select').value = driverProfileMemory.role;
+            document.getElementById('driver-phone-input').value = driverProfileMemory.phoneNumber;
+            
+            // Show the inputs directly for editing access
+            document.getElementById('profile-setup-fields-wrapper').style.display = 'block';
+            document.getElementById('profile-saved-identity-hud').style.display = 'none';
+            
+            // Hide shift timer field so they focus purely on updating personal records
+            document.getElementById('shift-end-time-picker-section').style.display = 'none';
+            
+            // Transform button modes to save corrections cleanly
+            const submitBtn = document.getElementById('profile-submit-action-btn');
+            submitBtn.innerText = "Save Adjustments";
+            submitBtn.setAttribute('onclick', 'saveProfileAdjustmentsDirectly()');
+            
+            document.getElementById('profile-close-action-btn').style.display = 'block';
+            
+            showModal('shift-scheduler-pop');
+        }
+
+        function forceExpandProfileEditor() {
+            document.getElementById('profile-setup-fields-wrapper').style.display = 'block';
+            document.getElementById('profile-saved-identity-hud').style.display = 'none';
+        }
+
+        // Save modifications from a mid-shift profile adjustment action
+        function saveProfileAdjustmentsDirectly() {
+            const companyVal = document.getElementById('driver-company-select').value.trim();
+            const carVal = document.getElementById('driver-car-input').value.trim();
+            const nameVal = document.getElementById('driver-name-input').value.trim();
+            const roleVal = document.getElementById('driver-role-select').value;
+            const phoneVal = document.getElementById('driver-phone-input').value.trim();
+            
+            if (!companyVal || companyVal === "__ADD_NEW_COMPANY__" || !carVal || !nameVal) {
+                alert("ALL PROFILE INFORMATION FIELDS ARE MANDATORY TO SECURE DRIVER ANCHOR IDENTITY.");
+                return;
+            }
+
+            // Write properties directly to memory storage cache
+            driverProfileMemory.company = companyVal;
+            driverProfileMemory.carNumber = carVal;
+            driverProfileMemory.displayName = nameVal;
+            driverProfileMemory.role = roleVal;
+            driverProfileMemory.phoneNumber = phoneVal;
+            
+            // Keep matching dashboard sync targets accurate
+            document.getElementById('match-company-target-select').value = companyVal;
+            
+            isProfileDataAnchored = true;
+            updateHudProfileTriggerButtonLabel();
+
+            // Refresh marker visuals dynamically
+            if (vehicleMarker && vehiclePos) {
+                map.removeLayer(vehicleMarker);
+                vehicleMarker = L.marker(vehiclePos, { icon: generateDynamicTaxiIcon() }).addTo(map);
+            }
+
+            hideModals();
+            alert("SUCCESS: Your profile registry identity configurations have been live adjusted!");
+        }
+
+        // =========================================================================================
+        // AUTO-HIDING ZOOM INTERACTION ENGINE
+        // =========================================================================================
+        function showZoomControlsTemporarily() {
+            if (!isShiftActive || driverProfileMemory.isSuspended) return;
+            const zoomBox = document.getElementById('dynamic-zoom-box');
+            zoomBox.classList.add('zoom-visible');
+            
+            clearTimeout(zoomVisibilityTimeout);
+            zoomVisibilityTimeout = setTimeout(() => {
+                zoomBox.classList.remove('zoom-visible');
+            }, 4000);
+        }
+
+        function executeManualZoomAction(direction) {
+            showZoomControlsTemporarily();
+            let currentZoom = map.getZoom();
+            let targetZoom = currentZoom + direction;
+            
+            if (targetZoom >= map.getMinZoom() && targetZoom <= map.getMaxZoom()) {
+                preferredZoomDepth = targetZoom;
+                map.setZoom(targetZoom);
+            }
+        }
+
+        map.on('zoomstart touchmove movestart pinchstart', function() {
+            showZoomControlsTemporarily();
+        });
+
+        map.on('zoomend', function() {
+            preferredZoomDepth = map.getZoom();
+        });
+
+        // =========================================================================================
+        // AUTOMATED SHIFT SCHEDULER CONTROLLER ENGINE WITH WEBSOCKET INITIALIZER
+        // =========================================================================================
+        function initializeDriverShiftTimer() {
+            // Read fields only if they are visible/active
+            if (!isProfileDataAnchored) {
+                const companyVal = document.getElementById('driver-company-select').value.trim();
+                const carVal = document.getElementById('driver-car-input').value.trim();
+                const nameVal = document.getElementById('driver-name-input').value.trim();
+                const roleVal = document.getElementById('driver-role-select').value;
+                const phoneVal = document.getElementById('driver-phone-input').value.trim();
+                
+                if (!companyVal || companyVal === "__ADD_NEW_COMPANY__" || !carVal || !nameVal) {
+                    alert("ALL PROFILE INFORMATION FIELDS ARE MANDATORY TO SECURE DRIVER ANCHOR IDENTITY.");
+                    return;
+                }
+
+                // Lock Profile Data Structures
+                driverProfileMemory.company = companyVal;
+                driverProfileMemory.carNumber = carVal;
+                driverProfileMemory.displayName = nameVal;
+                driverProfileMemory.role = roleVal;
+                driverProfileMemory.phoneNumber = phoneVal;
+                
+                // Update Matching panel prefill value dynamically
+                document.getElementById('match-company-target-select').value = companyVal;
+                
+                isProfileDataAnchored = true;
+            }
+
+            const timeInputValue = document.getElementById('shift-end-time-input').value;
+            if (!timeInputValue) {
+                alert("PLEASE SELECT A VALID SHIFT END TIME.");
+                return;
+            }
+
+            // Assign Permanent Unique ID Tracking Number if missing
+            if (!driverProfileMemory.uid) {
+                driverProfileMemory.uid = "DRV-" + Math.floor(100000 + Math.random() * 900000);
+            }
+
+            const [hours, minutes] = timeInputValue.split(':').map(Number);
+            const now = new Date();
+            let targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+
+            if (targetDate <= now) {
+                targetDate.setDate(targetDate.getDate() + 1);
+            }
+
+            targetShiftEndTimestamp = targetDate.getTime();
+            isShiftActive = true;
+            driverProfileMemory.isSuspended = false;
+
+            if (shiftMonitoringInterval) clearInterval(shiftMonitoringInterval);
+            shiftMonitoringInterval = setInterval(checkShiftTimeExpirationStatus, 1000);
+
+            updateHudProfileTriggerButtonLabel();
+
+            // Re-render vehicle marker with dynamic contextual layout configuration updates
+            if (vehicleMarker && vehiclePos) {
+                map.removeLayer(vehicleMarker);
+                vehicleMarker = L.marker(vehiclePos, { icon: generateDynamicTaxiIcon() }).addTo(map);
+            }
+
+            // TRIGGER REAL-TIME INTER-DEVICE NETWORK SYNC PIPELINE
+            initializeWebSocketConnection();
+
+            document.getElementById('shift-scheduler-pop').style.display = 'none';
+            document.getElementById('screen-overlay').style.display = 'none';
+        }
+
+        function checkShiftTimeExpirationStatus() {
+            if (!isShiftActive || !targetShiftEndTimestamp) return;
+
+            const currentTimestamp = Date.now();
+            if (currentTimestamp >= targetShiftEndTimestamp) {
+                shutDownActiveAppSession();
+            }
+        }
+
+        function shutDownActiveAppSession() {
+            isShiftActive = false;
+            if (shiftMonitoringInterval) clearInterval(shiftMonitoringInterval);
+            
+            audioMuted = true;
+            const btn = document.getElementById('mute-toggle-btn');
+            if (btn) {
+                btn.className = "util-circle active-mute";
+                btn.innerHTML = "AUDIO<br>MUTED";
+            }
+
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+
+            // Gracefully disconnect socket channels
+            if (globalSocketInstance) {
+                globalSocketInstance.close();
+                globalSocketInstance = null;
+            }
+
+            hideModals();
+            trackVehicleView = false;
+            document.getElementById('dynamic-zoom-box').classList.remove('zoom-visible');
+
+            // Reset Default Operational Content Text Layouts
+            document.getElementById('status-screen-emoji').innerText = "🏁";
+            document.getElementById('status-screen-heading').innerText = "Shift Completed";
+            document.getElementById('status-screen-body').innerText = "You have been signed off. The application is shut down and all audio updates are disabled. Have a safe drive home!";
+            
+            const restartBtn = document.getElementById('status-screen-btn');
+            restartBtn.style.display = "block";
+            restartBtn.innerText = "Start New Shift";
+
+            document.getElementById('shift-complete-screen').style.display = 'flex';
+        }
+
+        function restartAppSession() {
+            document.getElementById('shift-complete-screen').style.display = 'none';
+            audioMuted = false;
+            const btn = document.getElementById('mute-toggle-btn');
+            if (btn) {
+                btn.className = "util-circle";
+                btn.innerHTML = "AUDIO<br>ON";
+            }
+            
+            // Re-enable scheduling view configurations setup parameters
+            document.getElementById('profile-modal-main-title').innerText = "Driver Profile Setup";
+            document.getElementById('shift-end-time-picker-section').style.display = 'block';
+            
+            const submitBtn = document.getElementById('profile-submit-action-btn');
+            submitBtn.innerText = "Go On Duty";
+            submitBtn.setAttribute('onclick', 'initializeDriverShiftTimer()');
+            
+            document.getElementById('profile-close-action-btn').style.display = 'none';
+            
+            // Force dynamic assessment of profile cache state on manual restart
+            toggleProfileModalFieldsDisplay(isProfileDataAnchored);
+            
+            document.getElementById('screen-overlay').style.display = 'block';
+            document.getElementById('shift-scheduler-pop').style.display = 'block';
+        }
+
+        // =========================================================================================
+        // REAL-TIME WEBSOCKET DATA SYNC ENGINE (SANDBOX COMPATIBLE BROKER)
+        // =========================================================================================
+        function initializeWebSocketConnection() {
+            if (globalSocketInstance && globalSocketInstance.readyState === WebSocket.OPEN) return;
+
+            // Connects to a highly responsive, public Sandbox channels cluster broker
+            const sharedChannelUri = "wss://free.piesocket.com/v3/vancouver_cab_companion_pro?api_key=VCcp7V10_SandboxBrokerKey_NoAuthRequired";
+            
+            try {
+                globalSocketInstance = new WebSocket(sharedChannelUri);
+
+                globalSocketInstance.onmessage = function(event) {
+                    try {
+                        const incomingPackage = JSON.parse(event.data);
+                        
+                        // Ignore data reflections emitted by our own driver token identifier
+                        if (incomingPackage.senderUid === driverProfileMemory.uid) return;
+                        
+                        // Execute mapping projection procedures based on category routing instructions
+                        handleRemoteMarkerInjection(incomingPackage);
+                    } catch (err) {
+                        console.log("Network buffer ingestion error: " + err.message);
+                    }
+                };
+
+                globalSocketInstance.onerror = function() {
+                    console.log("WebSocket connection encountered a temporary error state.");
+                };
+
+                globalSocketInstance.onclose = function() {
+                    // Automatically retry connectivity cycles if shift parameters remain active
+                    if (isShiftActive && !driverProfileMemory.isSuspended) {
+                        setTimeout(initializeWebSocketConnection, 5000);
+                    }
+                };
+            } catch (e) {
+                console.log("WebSocket engine initialization failure: " + e.message);
+            }
+        }
+
+        function broadcastPayloadToPeerDevices(payloadObject) {
+            if (!globalSocketInstance || globalSocketInstance.readyState !== WebSocket.OPEN) return;
+            
+            // Append personal unique identifier signature to prevent loop echo reflections
+            payloadObject.senderUid = driverProfileMemory.uid;
+            
+            globalSocketInstance.send(JSON.stringify(payloadObject));
+        }
+
+        function handleRemoteMarkerInjection(data) {
+            if (!isShiftActive || driverProfileMemory.isSuspended) return;
+
+            const incomingPos = L.latLng(data.coordinates[0], data.coordinates[1]);
+
+            if (data.category === 'Flag') {
+                const redManIcon = L.divIcon({
+                    className: 'red-man-icon',
+                    html: data.subType === 'Hotel Driveway' ? '🏨' : '🚶',
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 32]
+                });
+
+                const flagMarker = L.marker(incomingPos, { icon: redManIcon }).addTo(map);
+                let headerLabel = `<strong style="color:#ff3b30;">FLAG WAITING</strong>`;
+                if (data.subType === 'Hotel Driveway') {
+                    headerLabel = `<strong style="color:#5856d6;">HOTEL DISPATCH FLAG</strong>`;
+                }
+
+                activeMarkersLog.push({
+                    category: 'Flag',
+                    timestamp: Date.now(),
+                    latlng: incomingPos,
+                    textString: data.textString,
+                    emojiIcon: data.subType === 'Hotel Driveway' ? '🏨' : '🚶',
+                    subType: data.subType
+                });
+
+                const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${incomingPos.lat},${incomingPos.lng}`;
+                flagMarker.bindPopup(`
+                    ${headerLabel} (REMOTE)<br>
+                    <strong>Placement:</strong> ${data.subType}<br>
+                    <span>Location: ${data.address}</span><br><br>
+                    <a href="${navigationUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:5px; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
+                `);
+
+                // Execute Text-to-Speech audio notification routines locally on Device B
+                dispatchRemoteAudioNarration(data.category, data.subType, data.address);
+
+                setTimeout(() => { map.removeLayer(flagMarker); }, 300000);
+            }
+            else if (data.category === 'Caution') {
+                let cautionIconHtml = "🚧";
+                let classLabel = "caution-closure-icon";
+                let anchorOffsets = [15, 15];
+                let customSize = [30, 30];
+
+                if (data.subType === 'Mild traffic') {
+                    cautionIconHtml = "🚘🚘"; classLabel = "caution-traffic-icon"; customSize = [50, 26]; anchorOffsets = [25, 13];
+                } else if (data.subType === 'Heavy traffic') {
+                    cautionIconHtml = "🚘🚘🚘🚘"; classLabel = "caution-traffic-icon"; customSize = [90, 26]; anchorOffsets = [45, 13];
+                } else if (data.subType === 'Accident') {
+                    cautionIconHtml = "💥🚗"; classLabel = "caution-accident-icon"; customSize = [44, 34]; anchorOffsets = [22, 17];
+                }
+
+                const cautionDivIcon = L.divIcon({ className: classLabel, html: cautionIconHtml, iconSize: customSize, iconAnchor: anchorOffsets });
+                const dynamicMarker = L.marker(incomingPos, { icon: cautionDivIcon }).addTo(map);
+
+                activeMarkersLog.push({
+                    category: 'Caution',
+                    timestamp: Date.now(),
+                    latlng: incomingPos,
+                    textString: data.textString,
+                    emojiIcon: cautionIconHtml,
+                    cssClass: classLabel,
+                    size: customSize,
+                    anchor: anchorOffsets,
+                    subType: data.subType,
+                    dir: data.dir
+                });
+
+                dynamicMarker.bindPopup(`
+                    <strong style="color:#b38f00;">${data.subType.toUpperCase()} (REMOTE)</strong><br>
+                    <strong>Direction:</strong> ${data.dir}<br>
+                    <span>Location: ${data.address}</span>
+                `);
+
+                dispatchRemoteAudioNarration(data.category, { type: data.subType, direction: data.dir }, data.address);
+
+                setTimeout(() => { map.removeLayer(dynamicMarker); }, 1200000);
+            }
+            else if (data.category === 'Police') {
+                const policeIcon = L.divIcon({ className: 'police-officer-icon', html: '👮', iconSize: [36, 36], iconAnchor: [18, 18] });
+                const officerMarker = L.marker(incomingPos, { icon: policeIcon }).addTo(map);
+
+                activeMarkersLog.push({
+                    category: 'Police',
+                    timestamp: Date.now(),
+                    latlng: incomingPos,
+                    textString: data.textString,
+                    emojiIcon: '👮',
+                    subType: data.subType,
+                    dir: data.dir
+                });
+
+                officerMarker.bindPopup(`
+                    <strong style="color:#007aff;">POLICE ENFORCEMENT (REMOTE)</strong><br>
+                    <strong>Type:</strong> ${data.subType.toUpperCase()} (${data.dir})<br>
+                    <span>Location: ${data.address}</span>
+                `);
+
+                dispatchRemoteAudioNarration(data.category, { type: data.subType, direction: data.dir }, data.address);
+
+                setTimeout(() => { map.removeLayer(officerMarker); }, 1800000);
+            }
+        }
+
+        function dispatchRemoteAudioNarration(category, payload, resolvedAddressStr) {
+            if (!isShiftActive || audioMuted || driverProfileMemory.isSuspended) return;
+
+            let finalSpeechString = "";
+            if (category === 'Flag') {
+                if (payload === 'Hotel Driveway') {
+                    finalSpeechString = `Remote updates: One flag waiting inside the driveway of the hotel at ${resolvedAddressStr}`;
+                } else {
+                    finalSpeechString = `Remote updates: One flag waiting ${payload.toLowerCase()} at ${resolvedAddressStr}`;
+                }
+            } 
+            else if (category === 'Caution') {
+                finalSpeechString = `Remote updates: One ${payload.type.toLowerCase()} reported ahead ${payload.direction.toLowerCase()} at ${resolvedAddressStr}`;
+            } 
+            else if (category === 'Police') {
+                const speechDirection = payload.direction.toLowerCase();
+                if (payload.type === 'emergency') {
+                    finalSpeechString = `Remote updates: One police reported ahead ${speechDirection} at ${resolvedAddressStr} emergency`;
+                } else if (payload.type === 'hidden') {
+                    finalSpeechString = `Remote updates: One police reported ahead ${speechDirection} at ${resolvedAddressStr} they are hiding`;
+                } else {
+                    finalSpeechString = `Remote updates: One police reported ahead ${speechDirection} at ${resolvedAddressStr} Radar Radar`;
+                }
+            }
+
+            lastSpokenSpeechString = finalSpeechString;
+            const clearHardwareBuffer = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(clearHardwareBuffer); 
+
+            setTimeout(() => {
+                if (driverProfileMemory.isSuspended) return;
+                const utterance = new SpeechSynthesisUtterance(finalSpeechString);
+                utterance.rate = 1.0; 
+                window.speechSynthesis.speak(utterance);
+            }, 1500);
+        }
+
+        // =========================================================================================
+        // DRIVER VEHICLE MATCHING CALENDAR ENGINE PIPELINE
+        // =========================================================================================
+        function openDriverMatchingPortal() {
+            hideModals();
+            
+            // Sync current profile variables with UI fields
+            document.getElementById('match-ui-current-role').innerText = driverProfileMemory.role.toUpperCase();
+            document.getElementById('match-ui-current-phone').innerText = driverProfileMemory.phoneNumber || "None Added (Update Profile Setup)";
+            
+            // Regenerate menu select parameters list 
+            syncCompanyDropdownUIFields();
+            document.getElementById('match-company-target-select').value = driverProfileMemory.company;
+            
+            renderMatchingBoardEntries();
+            showModal('driver-matching-pop');
+        }
+
+        function submitAvailabilityToMatchPool() {
+            // Mandate phone contact verification before accepting board entries
+            if (!driverProfileMemory.phoneNumber) {
+                alert("PHONE NUMBER IS REQUIRED IN YOUR DRIVER PROFILE SYSTEM BEFORE LOGGING CALENDAR AVAILABILITY TO SECURE BILATERAL COMMUNICATIONS.");
+                hideModals();
+                openFullProfileSettings();
+                return;
+            }
+
+            const chosenDate = document.getElementById('match-calendar-date').value;
+            const chosenShift = document.getElementById('match-calendar-shift').value;
+            const chosenCompany = document.getElementById('match-company-target-select').value;
+
+            if (!chosenDate) {
+                alert("PLEASE HIGHLIGHT A VALID TARGET DATE ON THE CALENDAR SYSTEM.");
+                return;
+            }
+            if (!chosenCompany || chosenCompany === "__ADD_NEW_COMPANY__") {
+                alert("PLEASE DECLARE A TARGET FLEET COMPANY FOR COOPERATIVE MATCH FILTERING.");
+                return;
+            }
+
+            // Construct new availability entry item matching custom company parameters
+            const newCalendarItem = {
+                id: "M-" + Math.floor(100000 + Math.random() * 900000),
+                name: driverProfileMemory.displayName,
+                role: driverProfileMemory.role,
+                company: chosenCompany,
+                carNumber: driverProfileMemory.role === "Owner" ? driverProfileMemory.carNumber : "N/A",
+                date: chosenDate,
+                shift: chosenShift,
+                phone: driverProfileMemory.phoneNumber
+            };
+
+            // Inject record entry directly into operational cache data models
+            mockSharedMatchingPool.push(newCalendarItem);
+            renderMatchingBoardEntries();
+            
+            alert(`SUCCESS: Your ${chosenShift} availability under "${chosenCompany}" for ${chosenDate} has been logged onto the shared marketplace boards!`);
+        }
+
+        function renderMatchingBoardEntries() {
+            const driversContainer = document.getElementById('matching-drivers-column-target');
+            const carsContainer = document.getElementById('matching-cars-column-target');
+            
+            driversContainer.innerHTML = "";
+            carsContainer.innerHTML = "";
+
+            const targetDate = document.getElementById('match-calendar-date').value;
+            const targetShift = document.getElementById('match-calendar-shift').value;
+            
+            // Normalize selected filter menu item value cleanly
+            const chosenCompanyVal = document.getElementById('match-company-target-select').value;
+            const targetCompanyNorm = chosenCompanyVal ? chosenCompanyVal.toLowerCase().trim() : "";
+            const myRole = driverProfileMemory.role; // "Driver" or "Owner"
+
+            let driverCount = 0;
+            let carCount = 0;
+
+            // Iterate and sort items into target dual-list arrays matching filtering requirements
+            mockSharedMatchingPool.forEach(item => {
+                if (item.date !== targetDate || item.shift !== targetShift) return;
+
+                const itemCompanyNorm = item.company.toLowerCase().trim();
+                
+                // BILATERAL DROPDOWN EXCHANGE FILTER RULE ENGINE:
+                // Match items against target filter option selection currently specified by user.
+                if (itemCompanyNorm !== targetCompanyNorm) return;
+
+                // Build Row
+                const row = document.createElement('div');
+                const isCrossRoleMatch = (item.role !== myRole);
+                row.className = "match-item-row" + (isCrossRoleMatch ? " is-perfect-match" : "");
+                
+                let matchBadgeHtml = isCrossRoleMatch ? `<span class="match-badge">Match</span>` : "";
+                let assetLabel = item.role === "Owner" ? `Car: #${item.carNumber}` : `Fleet: ${item.company}`;
+
+                row.innerHTML = `
+                    ${matchBadgeHtml}
+                    <strong>${item.name}</strong>
+                    <span style="font-size:0.72rem; color:#444;">${assetLabel}</span>
+                    <a href="tel:${item.phone}" class="match-call-btn">📞 Call</a>
+                `;
+
+                if (item.role === "Driver") {
+                    driversContainer.appendChild(row);
+                    driverCount++;
+                } else if (item.role === "Owner") {
+                    carsContainer.appendChild(row);
+                    carCount++;
+                }
+            });
+
+            if (driverCount === 0) {
+                driversContainer.innerHTML = `<div class="chat-empty-msg" style="padding-top:20px; font-size:0.75rem;">No Drivers</div>`;
+            }
+            if (carCount === 0) {
+                carsContainer.innerHTML = `<div class="chat-empty-msg" style="padding-top:20px; font-size:0.75rem;">No Cars</div>`;
+            }
+        }
+
+        // =========================================================================================
+        // ADMIN PORTAL PIPELINE AND ENFORCEMENT PROTOCOLS
+        // =========================================================================================
+        function accessAdminControlPortal() {
+            hideModals();
+            const challengeCode = prompt("ENTER CONFIDENTIAL ADMINISTRATIVE DISPATCH PASSCODE:");
+            if (challengeCode === null) return;
+            
+            if (challengeCode === "7777") {
+                document.getElementById('admin-display-uid').innerText = driverProfileMemory.uid || "Pending";
+                document.getElementById('admin-display-name').innerText = driverProfileMemory.displayName || "Unknown";
+                document.getElementById('admin-display-vehicle').innerText = `${driverProfileMemory.company} (#${driverProfileMemory.carNumber})`;
+                showModal('admin-control-pop');
+            } else {
+                alert("ACCESS DENIED. INVALID AUTHORIZATION SECURITY KEY CODE.");
+            }
+        }
+
+        function executeAdminSuspensionAction() {
+            const verification = confirm(`CONFIRM ENFORCEMENT: Place driver "${driverProfileMemory.displayName}" on a suspension time out session immediately?`);
+            if (!verification) return;
+
+            driverProfileMemory.isSuspended = true;
+            isShiftActive = false;
+            
+            if (shiftMonitoringInterval) clearInterval(shiftMonitoringInterval);
+            
+            audioMuted = true;
+            const btn = document.getElementById('mute-toggle-btn');
+            if (btn) { btn.className = "util-circle active-mute"; btn.innerHTML = "AUDIO<br>MUTED"; }
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+            if (globalSocketInstance) {
+                globalSocketInstance.close();
+                globalSocketInstance = null;
+            }
+
+            hideModals();
+            trackVehicleView = false;
+            document.getElementById('dynamic-zoom-box').classList.remove('zoom-visible');
+
+            // Hard lock the screen status layout block to prevent dashboard recovery escape
+            document.getElementById('status-screen-emoji').innerText = "⚠️";
+            document.getElementById('status-screen-heading').innerText = "Profile Suspended";
+            document.getElementById('status-screen-body').innerText = `Attention: Account status has been locked down by admin management. Your profile (${driverProfileMemory.uid}) is placed inside an active time out penalty. Communication modules disabled.`;
+            document.getElementById('status-screen-btn').style.display = "none"; 
+
+            document.getElementById('shift-complete-screen').style.display = 'flex';
+        }
+
+        // =========================================================================================
+        // MENU OVERLAY ROUTING SELECTIONS
+        // =========================================================================================
+        function openCautionSelectionFromMenu() {
+            hideModals();
+            showModal('caution-type-pop');
+        }
+
+        function openCamerasFromMenu() {
+            hideModals();
+            showModal('camera-menu-pop');
+        }
+
+        function triggerReplayFromMenu() {
+            hideModals();
+            replayLastAudioNarration();
+        }
+
+        function openChatLogHistoryMenuFromMenu() {
+            hideModals();
+            openChatLogHistoryMenu();
+        }
+
+        function openFeedbackFromMenu() {
+            hideModals();
+            showModal('suggestion-pop');
+        }
+
+        // STRICTLY FIXES ROUTING FLOW BACK TO THE UTILITY MENU
+        function backToUtilityMenu(currentModalId) {
+            document.getElementById(currentModalId).style.display = 'none';
+            showModal('utility-menu-pop');
+        }
+
+        function openCameraListMenu() {
+            showModal('camera-menu-pop');
+        } 
+
+        function openLiveCameraTab(targetUrl) {
+            window.open(targetUrl, '_blank');
+        } 
+
+        // Geolocation Engine Hooks
+        map.locate({ watch: true, enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
+
+        map.on('locationfound', function(e) {
+            if (driverProfileMemory.isSuspended) return;
+            vehiclePos = e.latlng;
+            if (!vehicleMarker) {
+                vehicleMarker = L.marker(e.latlng, { icon: generateDynamicTaxiIcon() }).addTo(map);
+                map.setView(e.latlng, preferredZoomDepth);
+            } else {
+                vehicleMarker.setLatLng(e.latlng);
+            } 
+            if (trackVehicleView) {
+                map.setView(e.latlng, preferredZoomDepth);
+            } 
+            fetchAddressFromCoordinates(e.latlng);
+        }); 
+
+        setInterval(() => {
+            if (trackVehicleView && vehiclePos && !driverProfileMemory.isSuspended) {
+                map.setView(vehiclePos, preferredZoomDepth);
+            }
+        }, 2000);
+        
+        map.on('dragstart', function() {
+            if (!isShiftActive) return;
+            trackVehicleView = false;
+            const btn = document.getElementById('lock-center-btn');
+            btn.className = "util-circle";
+            btn.innerHTML = "MAP<br>FREE";
+        }); 
+
+        // =========================================================================================
+        // REVERSE GEOLOCATION ENGINE
+        // =========================================================================================
+        function fetchAddressFromCoordinates(latlng, forcedCallback = null) {
+            let distanceMoved = 0;
+            if (lastGeocodedPos) {
+                distanceMoved = latlng.distanceTo(lastGeocodedPos);
+            } 
+
+            if (lastGeocodedPos && distanceMoved < 15 && currentAddressData.isLoaded && !forcedCallback) {
+                if (forcedCallback) forcedCallback();
+                return;
+            } 
+
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1&_cb=${Date.now()}`; 
+
+            fetch(url, { headers: { 'Accept-Language': 'en' } })
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.address) {
+                        currentAddressData.streetName = data.address.road || data.address.pedestrian || data.address.suburb || "Street Route";
+                        currentAddressData.houseNumber = data.address.house_number || "";
+                        currentAddressData.isLoaded = true;
+                        lastGeocodedPos = latlng;
+                    }
+                    if (forcedCallback) forcedCallback();
+                })
+                .catch(err => {
+                    console.log("Geocoding recovery active: " + err.message);
+                    if (distanceMoved > 20) {
+                        currentAddressData.houseNumber = "";
+                        currentAddressData.streetName = `Zone Track [${latlng.lat.toFixed(3)}]`;
+                    }
+                    if (forcedCallback) forcedCallback();
+                });
+        } 
+
+        function showModal(id) {
+            if (!isShiftActive && id !== 'shift-scheduler-pop') return;
+            
+            document.getElementById('screen-overlay').style.display = 'block';
+            document.getElementById(id).style.display = 'block';
+        } 
+
+        function hideModals() {
+            if (!isShiftActive) return;
+            
+            document.getElementById('screen-overlay').style.display = 'none';
+            document.querySelectorAll('.driver-modal').forEach(m => m.style.display = 'none');
+        } 
+
+        function handleRecenter() {
+            if (!isShiftActive || driverProfileMemory.isSuspended) return;
+            trackVehicleView = true;
+            const btn = document.getElementById('lock-center-btn');
+            btn.className = "util-circle active-center";
+            btn.innerHTML = "MAP<br>LOCKED";
+            if (vehiclePos) {
+                map.setView(vehiclePos, preferredZoomDepth);
+            }
+        } 
+
+        function handleMuteToggle() {
+            if (!isShiftActive || driverProfileMemory.isSuspended) return;
+            audioMuted = !audioMuted;
+            const btn = document.getElementById('mute-toggle-btn');
+            if(audioMuted) {
+                btn.className = "util-circle active-mute";
+                btn.innerHTML = "AUDIO<br>MUTED";
+            } else {
+                btn.className = "util-circle";
+                btn.innerHTML = "AUDIO<br>ON";
+            }
+        } 
+
+        // =========================================================================================
+        // DISPATCH PASSENGER FLAG MARKER
+        // =========================================================================================
+        function dropFlagDirect(selectionValue) {
+            if (!isShiftActive) return;
+            hideModals(); 
+            if (!vehiclePos) return; 
+
+            const targetPos = L.latLng(vehiclePos.lat, vehiclePos.lng); 
+
+            fetchAddressFromCoordinates(targetPos, function() {
+                const redManIcon = L.divIcon({
+                    className: 'red-man-icon',
+                    html: selectionValue === 'Hotel Driveway' ? '🏨' : '🚶',
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 32]
+                }); 
+
+                const flagMarker = L.marker(targetPos, { icon: redManIcon }).addTo(map);
+                const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName;
+                
+                let headerLabel = `<strong style="color:#ff3b30;">FLAG WAITING</strong>`;
+                let displayString = `Passenger Flag Waiting (${selectionValue}) at ${completeAddress}`;
+                if (selectionValue === 'Hotel Driveway') {
+                    headerLabel = `<strong style="color:#5856d6;">HOTEL DISPATCH FLAG</strong>`;
+                    displayString = `Hotel Dispatch Flag waiting at ${completeAddress}`;
+                }
+
+                activeMarkersLog.push({
+                    category: 'Flag',
+                    timestamp: Date.now(),
+                    latlng: targetPos,
+                    textString: displayString,
+                    emojiIcon: selectionValue === 'Hotel Driveway' ? '🏨' : '🚶',
+                    subType: selectionValue
+                });
+
+                const navigationUrl = `https://www.google.com/maps/search/?api=1&query=${targetPos.lat},${targetPos.lng}`;
+                flagMarker.bindPopup(`
+                    ${headerLabel}<br>
+                    <strong>Placement:</strong> ${selectionValue}<br>
+                    <span>Location: ${completeAddress}</span><br><br>
+                    <a href="${navigationUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:5px; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
+                `).openPopup(); 
+
+                // BROADCAST FLAG LOCATION IMMEDIATELY TO DEVICE B
+                broadcastPayloadToPeerDevices({
+                    category: 'Flag',
+                    subType: selectionValue,
+                    coordinates: [targetPos.lat, targetPos.lng],
+                    address: completeAddress,
+                    textString: displayString
+                });
+
+                dispatchAudioNarration('Flag', selectionValue); 
+
+                setTimeout(() => {
+                    map.removeLayer(flagMarker);
+                }, 300000); 
+            });
+        } 
+
+        // =========================================================================================
+        // CAUTION CONDITIONS
+        // =========================================================================================
+        function selectCautionType(type) {
+            if (!isShiftActive) return;
+            chosenCautionType = type;
+            hideModals();
+            showModal('caution-dir-pop');
+        } 
+
+        function dropCautionMarker(directionValue) {
+            if (!isShiftActive) return;
+            hideModals(); 
+            if (!vehiclePos) return; 
+
+            const targetPos = L.latLng(vehiclePos.lat, vehiclePos.lng);
+            const typeLabel = chosenCautionType;
+            const directionLabel = directionValue; 
+
+            fetchAddressFromCoordinates(targetPos, function() {
+                let cautionIconHtml = "";
+                let classLabel = "";
+                let anchorOffsets = [15, 15];
+                let customSize = [30, 30];
+
+                if (typeLabel === 'Mild traffic') {
+                    cautionIconHtml = "🚘🚘"; classLabel = "caution-traffic-icon"; customSize = [50, 26]; anchorOffsets = [25, 13];
+                } else if (typeLabel === 'Heavy traffic') {
+                    cautionIconHtml = "🚘🚘🚘🚘"; classLabel = "caution-traffic-icon"; customSize = [90, 26]; anchorOffsets = [45, 13];
+                } else if (typeLabel === 'Accident') {
+                    cautionIconHtml = "💥🚗"; classLabel = "caution-accident-icon"; customSize = [44, 34]; anchorOffsets = [22, 17];
+                } else if (typeLabel === 'Road closure') {
+                    cautionIconHtml = "🚧"; classLabel = "caution-closure-icon"; customSize = [34, 34]; anchorOffsets = [17, 17];
+                }
+
+                const cautionDivIcon = L.divIcon({ className: classLabel, html: cautionIconHtml, iconSize: customSize, iconAnchor: anchorOffsets });
+                const dynamicMarker = L.marker(targetPos, { icon: cautionDivIcon }).addTo(map); 
+                const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
+
+                const completeCautionText = `Caution Conditions: ${typeLabel} ahead (${directionLabel}) at ${completeAddress}`;
+
+                activeMarkersLog.push({
+                    category: 'Caution',
+                    timestamp: Date.now(),
+                    latlng: targetPos,
+                    textString: completeCautionText,
+                    emojiIcon: cautionIconHtml,
+                    cssClass: classLabel,
+                    size: customSize,
+                    anchor: anchorOffsets,
+                    subType: typeLabel,
+                    dir: directionLabel
+                });
+
+                dynamicMarker.bindPopup(`
+                    <strong style="color:#b38f00;">${typeLabel.toUpperCase()}</strong><br>
+                    <strong>Direction:</strong> ${directionLabel}<br>
+                    <span>Location: ${completeAddress}</span>
+                `).openPopup(); 
+
+                // BROADCAST HAZARD CONDITIONS TO DEVICE B
+                broadcastPayloadToPeerDevices({
+                    category: 'Caution',
+                    subType: typeLabel,
+                    dir: directionLabel,
+                    coordinates: [targetPos.lat, targetPos.lng],
+                    address: completeAddress,
+                    textString: completeCautionText
+                });
+
+                dispatchAudioNarration('Caution', { type: typeLabel, direction: directionLabel });
+
+                setTimeout(() => {
+                    map.removeLayer(dynamicMarker);
+                }, 1200000);
+            });
+        } 
+
+        // =========================================================================================
+        // POLICE DETECTION MARKERS
+        // =========================================================================================
+        function selectPoliceType(type) {
+            if (!isShiftActive) return;
+            chosenPoliceType = type.toLowerCase().trim();
+            hideModals();
+            showModal('police-dir-pop');
+        } 
+
+        function dropPoliceMarker(directionValue) {
+            if (!isShiftActive) return;
+            hideModals(); 
+            if (!vehiclePos) return; 
+
+            const targetPos = L.latLng(vehiclePos.lat, vehiclePos.lng);
+            const typeLabel = chosenPoliceType; 
+            const directionLabel = directionValue; 
+
+            fetchAddressFromCoordinates(targetPos, function() {
+                const policeIcon = L.divIcon({ className: 'police-officer-icon', html: '👮', iconSize: [36, 36], iconAnchor: [18, 18] });
+                const officerMarker = L.marker(targetPos, { icon: policeIcon }).addTo(map);
+                const completeAddress = currentAddressData.houseNumber ? `${currentAddressData.houseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName; 
+
+                const completePoliceText = `Police reported ahead ${directionLabel.toLowerCase()} at ${completeAddress} - Type: ${typeLabel.toUpperCase()}`;
+
+                activeMarkersLog.push({
+                    category: 'Police',
+                    timestamp: Date.now(),
+                    latlng: targetPos,
+                    textString: completePoliceText,
+                    emojiIcon: '👮',
+                    subType: typeLabel,
+                    dir: directionLabel
+                });
+
+                officerMarker.bindPopup(`
+                    <strong style="color:#007aff;">POLICE ENFORCEMENT</strong><br>
+                    <strong>Type:</strong> ${typeLabel.toUpperCase()} (${directionLabel})<br>
+                    <span>Location: ${completeAddress}</span>
+                `).openPopup(); 
+
+                // BROADCAST POLICE THREAT ZONES TO DEVICE B
+                broadcastPayloadToPeerDevices({
+                    category: 'Police',
+                    subType: typeLabel,
+                    dir: directionLabel,
+                    coordinates: [targetPos.lat, targetPos.lng],
+                    address: completeAddress,
+                    textString: completePoliceText
+                });
+
+                dispatchAudioNarration('Police', { type: typeLabel, direction: directionLabel });
+
+                setTimeout(() => {
+                    map.removeLayer(officerMarker);
+                }, 1800000);
+            });
+        } 
+
+        function breakHouseNumbersIntoCouples(numberStr) {
+            if (!numberStr || isNaN(numberStr)) return numberStr;
+            
+            if (numberStr.length === 4) {
+                const leadingPair = parseInt(numberStr.substring(0, 2), 10);
+                const trailingPair = parseInt(numberStr.substring(2, 4), 10);
+                if (trailingPair === 0) return `${leadingPair} hundred`;
+                if (trailingPair < 10) return `${leadingPair} oh ${trailingPair}`;
+                return `${leadingPair} ${trailingPair}`;
+            }
+            
+            if (numberStr.length === 3) {
+                const leadingDigit = parseInt(numberStr.substring(0, 1), 10);
+                const trailingPair = parseInt(numberStr.substring(1, 3), 10);
+                if (trailingPair === 0) return `${leadingDigit} hundred`;
+                if (trailingPair < 10) return `${leadingDigit} oh ${trailingPair}`;
+                return `${leadingDigit} ${trailingPair}`;
+            } 
+
+            return numberStr;
+        } 
+
+        // =========================================================================================
+        // TEXT-TO-SPEECH ANNOUNCEMENTS AUDIO ENGINE
+        // =========================================================================================
+        function dispatchAudioNarration(category, payload) {
+            if (!isShiftActive || audioMuted || driverProfileMemory.isSuspended) return; 
+
+            const spokenHouseNumber = breakHouseNumbersIntoCouples(currentAddressData.houseNumber);
+            const addressAudioString = spokenHouseNumber ? `${spokenHouseNumber} ${currentAddressData.streetName}` : currentAddressData.streetName;
+            
+            let finalSpeechString = "";
+            
+            if (category === 'Flag') {
+                if (payload === 'Hotel Driveway') {
+                    finalSpeechString = `One flag waiting inside the driveway of the hotel at ${addressAudioString}`;
+                } else {
+                    finalSpeechString = `One flag waiting ${payload.toLowerCase()} at ${addressAudioString}`;
+                }
+            } 
+            else if (category === 'Caution') {
+                finalSpeechString = `One ${payload.type.toLowerCase()} reported ahead ${payload.direction.toLowerCase()} at ${addressAudioString}`;
+            } 
+            else if (category === 'Police') {
+                const speechDirection = payload.direction.toLowerCase();
+                
+                if (payload.type === 'emergency') {
+                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} emergency`;
+                } 
+                else if (payload.type === 'hidden') {
+                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} they are hiding they are hiding`;
+                } 
+                else {
+                    finalSpeechString = `One police reported ahead ${speechDirection} at ${addressAudioString} Radar Radar`;
+                }
+            } 
+
+            lastSpokenSpeechString = finalSpeechString;
+
+            const clearHardwareBuffer = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(clearHardwareBuffer); 
+
+            setTimeout(() => {
+                if (driverProfileMemory.isSuspended) return;
+                const utterance = new SpeechSynthesisUtterance(finalSpeechString);
+                utterance.rate = 1.0; 
+                window.speechSynthesis.speak(utterance);
+            }, 1500);
+        } 
+
+        function replayLastAudioNarration() {
+            if (!isShiftActive || !lastSpokenSpeechString || driverProfileMemory.isSuspended) return;
+            
+            const clearHardwareBuffer = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(clearHardwareBuffer); 
+
+            setTimeout(() => {
+                if (driverProfileMemory.isSuspended) return;
+                const utterance = new SpeechSynthesisUtterance(lastSpokenSpeechString);
+                utterance.rate = 1.0; 
+                window.speechSynthesis.speak(utterance);
+            }, 200);
+        }
+
+        function submitDriverSuggestion() {
+            if (!isShiftActive) return;
+            const field = document.getElementById('driver-suggestion-text');
+            const note = field.value.trim();
+            
+            if (!note) {
+                alert("Please enter a suggestion before submitting.");
+                return;
+            }
+            
+            console.log("SUGGESTION CAPTURED: ", {
+                timestamp: new Date().toISOString(),
+                driverId: driverProfileMemory.uid,
+                driverName: driverProfileMemory.displayName,
+                coordinates: vehiclePos ? [vehiclePos.lat, vehiclePos.lng] : "No GPS context",
+                messageContent: note
+            });
+            
+            field.value = "";
+            hideModals();
+            alert("Thank you! Your suggestion has been recorded.");
+        }
+
+        // =========================================================================================
+        // CHAT LOG HISTORY PANEL ARCHITECTURE
+        // =========================================================================================
+        function openChatLogHistoryMenu() {
+            if (!isShiftActive) return;
+            showModal('chat-log-pop');
+            switchChatLogTab(activeChatLogTab);
+        }
+
+        function switchChatLogTab(categoryTab) {
+            if (!isShiftActive) return;
+            activeChatLogTab = categoryTab;
+            
+            document.getElementById('tab-btn-flag').className = "chat-tab-btn" + (categoryTab === 'Flag' ? " active-tab-flags" : "");
+            document.getElementById('tab-btn-caution').className = "chat-tab-btn" + (categoryTab === 'Caution' ? " active-tab-caution" : "");
+            document.getElementById('tab-btn-police').className = "chat-tab-btn" + (categoryTab === 'Police' ? " active-tab-police" : "");
+            
+            renderChatLogList();
+        }
+
+        function renderChatLogList() {
+            const container = document.getElementById('chat-list-target');
+            container.innerHTML = "";
+            
+            const now = Date.now();
+            const timeLimitMs = (activeChatLogTab === 'Police') ? (120 * 60 * 1000) : (30 * 60 * 1000);
+            
+            const filteredItems = activeMarkersLog.filter(item => {
+                return item.category === activeChatLogTab && (now - item.timestamp <= timeLimitMs);
+            });
+            
+            filteredItems.sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (filteredItems.length === 0) {
+                container.innerHTML = `<div class="chat-empty-msg">No recent ${activeChatLogTab.toLowerCase()} logs found</div>`;
+                return;
+            }
+            
+            filteredItems.forEach(item => {
+                const elapsedMins = Math.round((now - item.timestamp) / 60000);
+                const logCard = document.createElement('div');
+                logCard.className = "chat-log-item";
+                
+                logCard.onclick = function() {
+                    if (!isShiftActive) return;
+                    hideModals();
+                    trackVehicleView = false;
+                    
+                    const centerBtn = document.getElementById('lock-center-btn');
+                    centerBtn.className = "util-circle";
+                    centerBtn.innerHTML = "MAP<br>FREE";
+                    
+                    map.setView(item.latlng, preferredZoomDepth);
+                    
+                    let customHistoryIcon;
+                    let popupContentHtml = "";
+                    
+                    if (item.category === 'Flag') {
+                        const targetNavUrl = `https://www.google.com/maps/search/?api=1&query=${item.latlng.lat},${item.latlng.lng}`;
+                        customHistoryIcon = L.divIcon({
+                            className: 'red-man-icon',
+                            html: item.emojiIcon || '🚶',
+                            iconSize: [34, 34],
+                            iconAnchor: [17, 32]
+                        });
+                        popupContentHtml = `
+                            <strong style="color:#ff3b30;">HISTORICAL LOGGED FLAG</strong><br>
+                            <span>${item.textString}</span><br><br>
+                            <a href="${targetNavUrl}" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; font-weight:bold; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:5px; text-transform:uppercase; font-size:11px;">Navigate to Flag</a>
+                        `;
+                    } 
+                    else if (item.category === 'Caution') {
+                        customHistoryIcon = L.divIcon({
+                            className: item.cssClass || 'caution-closure-icon',
+                            html: item.emojiIcon || '🚧',
+                            iconSize: item.size || [34, 34],
+                            iconAnchor: item.anchor || [17, 17]
+                        });
+                        popupContentHtml = `
+                            <strong style="color:#b38f00;">HISTORICAL CAUTION REPORT</strong><br>
+                            <span>${item.textString}</span>
+                        `;
+                    } 
+                    else if (item.category === 'Police') {
+                        customHistoryIcon = L.divIcon({
+                            className: 'police-officer-icon',
+                            html: '👮',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 18]
+                        });
+                        popupContentHtml = `
+                            <strong style="color:#007aff;">HISTORICAL POLICE LOG</strong><br>
+                            <span>${item.textString}</span>
+                        `;
+                    }
+                    
+                    const temporaryHistoryMarker = L.marker(item.latlng, { icon: customHistoryIcon }).addTo(map);
+                    temporaryHistoryMarker.bindPopup(popupContentHtml).openPopup();
+                    
+                    setTimeout(() => {
+                        map.removeLayer(temporaryHistoryMarker);
+                    }, 30000);
+                };
+                
+                logCard.innerHTML = `
+                    <span class="time-badge">${elapsedMins === 0 ? 'Just Now' : elapsedMins + ' mins ago'}</span>
+                    ${item.textString}
+                `;
+                container.appendChild(logCard);
+            });
+        }
+
+        // Screen Wake Lock Handler
+        async function maintainScreenWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockToken = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log("Wake lock framework notice: " + err.message);
+            }
+        } 
+
+        window.addEventListener('load', maintainScreenWakeLock); 
+
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLockToken !== null && document.visibilityState === 'visible') {
+                maintainScreenWakeLock();
+            }
+        });
+    </script>
+</body>
+</html>
